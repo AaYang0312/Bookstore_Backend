@@ -20,5 +20,5 @@ type Book struct {
 	Format      string    `json:"format"`      // 装帧格式
 	CategoryID  uint      `json:"category_id"` // 分类id
 	CreatedAt   time.Time `json:"created_at"`
-	UpdateAt    time.Time `json:"update_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

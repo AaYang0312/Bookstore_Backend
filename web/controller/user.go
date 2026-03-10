@@ -29,6 +29,7 @@ func UserRegister(ctx *gin.Context) {
 			"message": "参数绑定失败",
 			"error":   err,
 		})
+		return
 	}
 	// TODO:验证码的校验
 	svc := service.NewUserService()
@@ -48,6 +49,7 @@ func UserRegister(ctx *gin.Context) {
 			"code":    -1,
 			"message": err.Error(),
 		})
+		return
 	}
 
 	// 成功

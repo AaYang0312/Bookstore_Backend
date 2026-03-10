@@ -11,5 +11,5 @@ type Order struct {
 	IsPaid      bool      `json:"is_paid"` // 支付状态
 	PaymentTime time.Time `json:"payment_time"`
 	CreatedAt   time.Time `json:"created_at"`
-	UpdateAt    time.Time `json:"update_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

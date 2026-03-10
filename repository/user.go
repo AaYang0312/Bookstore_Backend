@@ -19,31 +19,19 @@ func NewUserDAO() *UserDAO {
 
 func (u *UserDAO) CreateUser(user *model.User) error {
 	return u.db.Debug().Create(user).Error
-	return nil
 }
 
 func (u *UserDAO) CheckUserExists(username, phone, email string) (bool, error) {
-	var count int64 = 0
-	err := u.db.Model(&model.User{}).Where("username = ?", username).Count(&count).Error
+	var total int64
+
+	// 使用 OR 条件一次性检查三个字段
+	err := u.db.Model(&model.User{}).
+		Where("username = ? OR phone = ? OR email = ?", username, phone, email).
+		Count(&total).Error
+
 	if err != nil {
 		return false, err
 	}
-	if count > 0 {
-		return true, err
-	}
-	err = u.db.Model(&model.User{}).Where("phone = ?", phone).Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-	if count > 0 {
-		return true, err
-	}
-	err = u.db.Model(&model.User{}).Where("email = ?", email).Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-	if count > 0 {
-		return true, err
-	}
-	return count > 0, nil
+
+	return total > 0, nil
 }
