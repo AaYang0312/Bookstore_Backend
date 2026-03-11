@@ -58,5 +58,9 @@ func InitRouter() *gin.Engine {
 			user.POST("/login", controller.UserLogin)
 		}
 	}
+	captcha := v1.Group("/captcha")
+	{
+		captcha.GET("/generate", controller.GenerateCaptcha)
+	}
 	return r
 }

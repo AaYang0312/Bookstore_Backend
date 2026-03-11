@@ -31,7 +31,6 @@ func UserRegister(ctx *gin.Context) {
 		})
 		return
 	}
-	// TODO:验证码的校验
 	svc := service.NewUserService()
 	// 验证密码两次是否一致
 	if req.Password != req.ConfirmPassword {

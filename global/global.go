@@ -43,6 +43,7 @@ func InitRedis() {
 		log.Fatalln("redis连接失败：", err)
 		return
 	}
+	RedisClient = client
 	log.Println("Redis连接成功")
 }
 
