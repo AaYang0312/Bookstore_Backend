@@ -14,6 +14,8 @@ type RegisterRequest struct {
 	ConfirmPassword string `json:"confirm_password"`
 	Email           string `json:"email"`
 	Phone           string `json:"phone"`
+	CaptchaID       string `json:"captcha_id"`
+	CaptchaValue    string `json:"captcha_value"`
 }
 type LoginRequest struct {
 	Username string `json:"username"`
@@ -32,6 +34,14 @@ func UserRegister(ctx *gin.Context) {
 		return
 	}
 	svc := service.NewUserService()
+	captSvc := service.NewCaptchaService()
+	if !captSvc.VerifyCaptcha(req.CaptchaID, req.CaptchaValue) {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    -1,
+			"message": "验证码错误",
+		})
+	}
+
 	// 验证密码两次是否一致
 	if req.Password != req.ConfirmPassword {
 		// 用户请求错误
@@ -58,5 +68,6 @@ func UserRegister(ctx *gin.Context) {
 	})
 }
 func UserLogin(ctx *gin.Context) {
+	// JWT: 用于验证用户身份的一段 Hash 值，服务端根据 JWT 获取对应用户信息
 
 }
