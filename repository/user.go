@@ -35,3 +35,14 @@ func (u *UserDAO) CheckUserExists(username, phone, email string) (bool, error) {
 
 	return total > 0, nil
 }
+
+func (u *UserDAO) CheckLoginUserExists(username string) (*model.User, error) {
+	var user model.User
+
+	err := u.db.Model(&model.User{}).Debug().
+		Where("username = ?", username).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

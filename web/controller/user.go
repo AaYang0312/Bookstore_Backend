@@ -18,8 +18,10 @@ type RegisterRequest struct {
 	CaptchaValue    string `json:"captcha_value"`
 }
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	CaptchaID    string `json:"captcha_id"`
+	CaptchaValue string `json:"captcha_value"`
 }
 
 func UserRegister(ctx *gin.Context) {
@@ -69,5 +71,35 @@ func UserRegister(ctx *gin.Context) {
 }
 func UserLogin(ctx *gin.Context) {
 	// JWT: 用于验证用户身份的一段 Hash 值，服务端根据 JWT 获取对应用户信息
-
+	// 1. 验证图片验证码
+	// 2. 校验用户信息，是否有这个用户，校验密码是否正确
+	// 3. 返回 JWT 信息给用户，后面发送就知道是哪个用户
+	var req LoginRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    -1,
+			"message": "请求参数绑定错误",
+			"error":   err.Error(),
+		})
+	}
+	captSvc := service.NewCaptchaService()
+	if !captSvc.VerifyCaptcha(req.CaptchaID, req.CaptchaValue) {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    -1,
+			"message": "验证码错误",
+		})
+	}
+	userSvc := service.NewUserService()
+	response, err := userSvc.UserLogin(req.Username, req.Password)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": err.Error(),
+		})
+	}
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"data":    response,
+		"message": "登陆成功",
+	})
 }

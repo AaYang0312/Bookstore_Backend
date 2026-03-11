@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bookstore-manager/jwt"
 	"bookstore-manager/model"
 	"bookstore-manager/repository"
 	"errors"
@@ -10,6 +11,19 @@ import (
 
 type UserService struct {
 	UserDB *repository.UserDAO
+}
+
+type LoginResponse struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	ExpireIn     int64     `json:"expire_in"`
+	Userinfo     *UserInfo `json:"user_info"`
+}
+type UserInfo struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
 }
 
 // service --> repository --> 调用 db 方法(操作 model 里的模型)
@@ -41,6 +55,35 @@ func (u *UserService) UserRegister(username, password, phone, email string) erro
 	return nil
 }
 
+func (u *UserService) UserLogin(username, password string) (*LoginResponse, error) {
+	// 查询有没有这个用户
+	user, err := u.UserDB.CheckLoginUserExists(username)
+	if err != nil {
+		return nil, errors.New("用户不存在")
+	}
+	// 如果用户存在，验证密码
+	if !u.verifyPassword(user.Password, password) {
+		return nil, errors.New("密码错误")
+	}
+	// 返回 JWT
+	token, err_ := jwt.GenerateTokenPair(uint(user.ID), username)
+	if err_ != nil {
+		return nil, errors.New("生成token失败")
+	}
+	response := &LoginResponse{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		ExpireIn:     token.ExpiresIn,
+		Userinfo: &UserInfo{
+			ID:       user.ID,
+			Username: user.Username,
+			Email:    user.Email,
+			Phone:    user.Phone,
+		},
+	}
+	return response, nil
+}
+
 // 小写开头，对外不可见
 func (u *UserService) encodePassword(password string) string {
 	return base64x.StdEncoding.EncodeToString([]byte(password))
@@ -53,4 +96,8 @@ func (u *UserService) createUser(username, passwordHash, phone, email string) er
 		Email:    email,
 	}
 	return u.UserDB.CreateUser(user)
+}
+
+func (u *UserService) verifyPassword(storedPassword, password string) bool {
+	return u.encodePassword(password) == storedPassword
 }
