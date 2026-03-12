@@ -3,13 +3,17 @@ package model
 import "time"
 
 type User struct {
-	ID        int       `json:"id"`
+	ID        int       `gorm:"primaryKey" json:"id"`
 	Username  string    `json:"username"` // 用户名
 	Password  string    `json:"password"`
 	Email     string    `json:"email"`
 	Phone     string    `json:"phone"`
 	Avatar    string    `json:"avatar"` // 头像
-	IsAdmin   bool      `json:"is_admin"`
+	IsAdmin   bool      `gorm:"default:false" json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (u *User) TableName() string {
+	return "users" // 数据库中的名字
 }

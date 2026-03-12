@@ -2,6 +2,7 @@ package router
 
 import (
 	"bookstore-manager/web/controller"
+	"bookstore-manager/web/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,6 +59,14 @@ func InitRouter() *gin.Engine {
 		{
 			user.POST("/register", userController.UserRegister)
 			user.POST("/login", userController.UserLogin)
+		}
+		auth := user.Group("")
+		{
+			auth.Use(middleware.JWTAuthMiddleware())
+			{
+				auth.GET("/profile", userController.GetUserProfile)
+				//auth.PUT("/profile", userController.UpdateUserProfile)
+			}
 		}
 	}
 	captcha := v1.Group("/captcha")

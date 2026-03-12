@@ -114,3 +114,36 @@ func (u *UserController) UserLogin(ctx *gin.Context) {
 		"message": "登陆成功",
 	})
 }
+
+func (u *UserController) GetUserProfile(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(401, gin.H{
+			"code":    -1,
+			"message": "用户未登录",
+		})
+	}
+	// 调用服务层的获取用户信息
+	user, err := u.UserService.GetUserByID(userID.(int))
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": err.Error(),
+		})
+		return
+	}
+	response := gin.H{
+		"id":         user.ID,
+		"username":   user.Username,
+		"email":      user.Email,
+		"phone":      user.Phone,
+		"avatar":     user.Avatar,
+		"created_at": user.CreatedAt.Format("2006-01-02 15:04:05"),
+		"updated_at": user.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"data":    response,
+		"message": "获取用户信息成功",
+	})
+}

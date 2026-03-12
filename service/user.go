@@ -101,3 +101,11 @@ func (u *UserService) createUser(username, passwordHash, phone, email string) er
 func (u *UserService) verifyPassword(storedPassword, password string) bool {
 	return u.encodePassword(password) == storedPassword
 }
+
+func (u *UserService) GetUserByID(userID int) (*model.User, error) {
+	user, err := u.UserDB.GetUserByID(userID)
+	if err != nil {
+		return nil, errors.New("用户不存在")
+	}
+	return user, nil
+}

@@ -46,3 +46,13 @@ func (u *UserDAO) CheckLoginUserExists(username string) (*model.User, error) {
 	}
 	return &user, nil
 }
+
+func (u *UserDAO) GetUserByID(userID int) (*model.User, error) {
+	var user model.User
+
+	err := u.db.Debug().First(&user, userID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
