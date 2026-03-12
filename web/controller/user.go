@@ -7,6 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 给 controller 对象做归属
+type UserController struct {
+	UserService *service.UserService
+}
+
+func NewUserController() *UserController {
+	return &UserController{
+		UserService: service.NewUserService(),
+	}
+}
+
 // 注册的请求参数
 type RegisterRequest struct {
 	Username        string `json:"username"`
@@ -24,7 +35,7 @@ type LoginRequest struct {
 	CaptchaValue string `json:"captcha_value"`
 }
 
-func UserRegister(ctx *gin.Context) {
+func (u *UserController) UserRegister(ctx *gin.Context) {
 	var req RegisterRequest
 	err := ctx.ShouldBindBodyWithJSON(&req)
 	if err != nil {
@@ -35,7 +46,7 @@ func UserRegister(ctx *gin.Context) {
 		})
 		return
 	}
-	svc := service.NewUserService()
+	//svc := service.NewUserService()
 	captSvc := service.NewCaptchaService()
 	if !captSvc.VerifyCaptcha(req.CaptchaID, req.CaptchaValue) {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -53,7 +64,7 @@ func UserRegister(ctx *gin.Context) {
 		})
 		return
 	}
-	err = svc.UserRegister(req.Username, req.Password, req.Phone, req.Email)
+	err = u.UserService.UserRegister(req.Username, req.Password, req.Phone, req.Email)
 	if err != nil {
 		// 服务器内部错误
 		ctx.JSON(http.StatusInternalServerError, gin.H{
@@ -69,7 +80,7 @@ func UserRegister(ctx *gin.Context) {
 		"message": "注册成功",
 	})
 }
-func UserLogin(ctx *gin.Context) {
+func (u *UserController) UserLogin(ctx *gin.Context) {
 	// JWT: 用于验证用户身份的一段 Hash 值，服务端根据 JWT 获取对应用户信息
 	// 1. 验证图片验证码
 	// 2. 校验用户信息，是否有这个用户，校验密码是否正确
@@ -89,8 +100,8 @@ func UserLogin(ctx *gin.Context) {
 			"message": "验证码错误",
 		})
 	}
-	userSvc := service.NewUserService()
-	response, err := userSvc.UserLogin(req.Username, req.Password)
+	//userSvc := service.NewUserService()
+	response, err := u.UserService.UserLogin(req.Username, req.Password)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"code":    -1,

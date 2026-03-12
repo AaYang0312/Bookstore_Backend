@@ -50,17 +50,19 @@ func InitRouter() *gin.Engine {
 		// 8. 继续执行后续处理
 		c.Next()
 	})
+	userController := controller.NewUserController()
+	captchaController := controller.NewCaptchaController()
 	v1 := r.Group("/api/v1")
 	{
 		user := v1.Group("/user")
 		{
-			user.POST("/register", controller.UserRegister)
-			user.POST("/login", controller.UserLogin)
+			user.POST("/register", userController.UserRegister)
+			user.POST("/login", userController.UserLogin)
 		}
 	}
 	captcha := v1.Group("/captcha")
 	{
-		captcha.GET("/generate", controller.GenerateCaptcha)
+		captcha.GET("/generate", captchaController.GenerateCaptcha)
 	}
 	return r
 }
