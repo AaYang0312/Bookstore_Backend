@@ -124,3 +124,18 @@ func (u *UserService) UpdateUserInfo(user *model.User) error {
 	// 调用 DAO 层更新信息
 	return u.UserDB.UpdateUser(existingUser)
 }
+
+func (u *UserService) ChangePassword(userID int, oldPassword, newPassword string) error {
+	// 获取对应用户
+	user, err := u.UserDB.GetUserByID(userID)
+	if err != nil {
+		return errors.New("用户不存在")
+	}
+	// 验证旧密码
+	if !u.verifyPassword(user.Password, oldPassword) {
+		return errors.New("密码错误")
+	}
+	// 操作数据库修改密码
+	user.Password = u.encodePassword(newPassword)
+	return u.UserDB.ChangePassword(user)
+}

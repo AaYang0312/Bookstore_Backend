@@ -185,7 +185,6 @@ func (u *UserController) UpdateUserProfile(ctx *gin.Context) {
 		})
 		return
 	}
-	//TODO: 获取更新后的信息
 
 	updatedUser, err := u.UserService.GetUserByID(userID.(int))
 	if err != nil {
@@ -201,5 +200,47 @@ func (u *UserController) UpdateUserProfile(ctx *gin.Context) {
 		"code":    0,
 		"message": "更新用户信息成功",
 		"data":    updatedUser,
+	})
+}
+
+func (u *UserController) ChangePassword(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(401, gin.H{
+			"code":    -1,
+			"message": "用户未登录",
+		})
+		return
+	}
+	// 前端传来的两个参数
+	var passwordData struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := ctx.ShouldBindJSON(&passwordData); err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": err.Error(),
+		})
+		return
+	}
+	if len(passwordData.NewPassword) < 6 {
+		ctx.JSON(400, gin.H{
+			"code":    -1,
+			"message": "新密码不得小于6位",
+		})
+		return
+	}
+	err := u.UserService.ChangePassword(userID.(int), passwordData.OldPassword, passwordData.NewPassword)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": err.Error(),
+		})
+		return
+	}
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"message": "修改密码成功",
 	})
 }

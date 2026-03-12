@@ -66,6 +66,7 @@ func InitRouter() *gin.Engine {
 			{
 				auth.GET("/profile", userController.GetUserProfile)
 				auth.PUT("/profile", userController.UpdateUserProfile)
+				auth.PUT("/password", userController.ChangePassword)
 			}
 		}
 	}

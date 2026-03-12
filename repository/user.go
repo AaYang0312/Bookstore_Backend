@@ -57,3 +57,7 @@ func (u *UserDAO) GetUserByID(userID int) (*model.User, error) {
 	return &user, nil
 }
 func (u *UserDAO) UpdateUser(user *model.User) error { return u.db.Debug().Save(user).Error }
+
+func (u *UserDAO) ChangePassword(user *model.User) error {
+	return u.db.Debug().Updates(user).Error
+}
