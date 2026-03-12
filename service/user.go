@@ -109,3 +109,18 @@ func (u *UserService) GetUserByID(userID int) (*model.User, error) {
 	}
 	return user, nil
 }
+
+func (u *UserService) UpdateUserInfo(user *model.User) error {
+	// 用户是否存在
+	existingUser, err := u.UserDB.GetUserByID(user.ID)
+	if err != nil {
+		return errors.New("用户不存在")
+	}
+	existingUser.Phone = user.Phone
+	existingUser.Email = user.Email
+	existingUser.Username = user.Username
+	existingUser.Avatar = user.Avatar
+
+	// 调用 DAO 层更新信息
+	return u.UserDB.UpdateUser(existingUser)
+}

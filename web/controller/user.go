@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bookstore-manager/model"
 	"bookstore-manager/service"
 	"net/http"
 
@@ -145,5 +146,60 @@ func (u *UserController) GetUserProfile(ctx *gin.Context) {
 		"code":    0,
 		"data":    response,
 		"message": "获取用户信息成功",
+	})
+}
+func (u *UserController) UpdateUserProfile(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(401, gin.H{
+			"code":    -1,
+			"message": "用户未登录",
+		})
+		return
+	}
+	var updateData struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Phone    string `json:"phone"`
+		Avatar   string `json:"avatar"`
+	}
+
+	if err := ctx.ShouldBindJSON(&updateData); err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": err.Error(),
+		})
+		return
+	}
+	user := &model.User{
+		ID:       userID.(int),
+		Username: updateData.Username,
+		Email:    updateData.Email,
+		Phone:    updateData.Phone,
+	}
+	if err := u.UserService.UpdateUserInfo(user); err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": "更新用户信息失败",
+			"error":   err.Error(),
+		})
+		return
+	}
+	//TODO: 获取更新后的信息
+
+	updatedUser, err := u.UserService.GetUserByID(userID.(int))
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": "获取更新后用户信息失败",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"message": "更新用户信息成功",
+		"data":    updatedUser,
 	})
 }

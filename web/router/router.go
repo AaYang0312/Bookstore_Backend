@@ -65,7 +65,7 @@ func InitRouter() *gin.Engine {
 			auth.Use(middleware.JWTAuthMiddleware())
 			{
 				auth.GET("/profile", userController.GetUserProfile)
-				//auth.PUT("/profile", userController.UpdateUserProfile)
+				auth.PUT("/profile", userController.UpdateUserProfile)
 			}
 		}
 	}
