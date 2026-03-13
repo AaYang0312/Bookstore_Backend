@@ -54,6 +54,7 @@ func (u *UserController) UserRegister(ctx *gin.Context) {
 			"code":    -1,
 			"message": "验证码错误",
 		})
+		return
 	}
 
 	// 验证密码两次是否一致
@@ -93,6 +94,7 @@ func (u *UserController) UserLogin(ctx *gin.Context) {
 			"message": "请求参数绑定错误",
 			"error":   err.Error(),
 		})
+		return
 	}
 	captSvc := service.NewCaptchaService()
 	if !captSvc.VerifyCaptcha(req.CaptchaID, req.CaptchaValue) {
@@ -100,6 +102,7 @@ func (u *UserController) UserLogin(ctx *gin.Context) {
 			"code":    -1,
 			"message": "验证码错误",
 		})
+		return
 	}
 	//userSvc := service.NewUserService()
 	response, err := u.UserService.UserLogin(req.Username, req.Password)
@@ -108,6 +111,7 @@ func (u *UserController) UserLogin(ctx *gin.Context) {
 			"code":    -1,
 			"message": err.Error(),
 		})
+		return
 	}
 	ctx.JSON(200, gin.H{
 		"code":    0,
@@ -123,6 +127,7 @@ func (u *UserController) GetUserProfile(ctx *gin.Context) {
 			"code":    -1,
 			"message": "用户未登录",
 		})
+		return
 	}
 	// 调用服务层的获取用户信息
 	user, err := u.UserService.GetUserByID(userID.(int))
