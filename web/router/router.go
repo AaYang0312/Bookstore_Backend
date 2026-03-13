@@ -74,6 +74,7 @@ func InitRouter() *gin.Engine {
 		{
 			book.GET("/hot", bookController.GetHotBooks)
 			book.GET("/new", bookController.GetNewBooks)
+			book.GET("/list", bookController.GetBookList)
 		}
 	}
 	captcha := v1.Group("/captcha")

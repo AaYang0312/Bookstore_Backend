@@ -34,3 +34,18 @@ func (b *BookDAO) GetNewBooks(limit int) ([]*model.Book, error) {
 	}
 	return books, nil
 }
+func (b *BookDAO) GetBooksByPage(page, pageSize int) ([]*model.Book, int64, error) {
+	var books []*model.Book
+	var total int64
+	err := b.db.Debug().Model(&model.Book{}).Where("status = ?", 1).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	// 计算偏移量
+	offset := (page - 1) * pageSize
+	err = b.db.Where("status = ?", 1).Offset(offset).Limit(pageSize).Find(&books).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return books, total, nil
+}

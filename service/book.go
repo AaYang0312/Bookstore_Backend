@@ -22,3 +22,7 @@ func (b *BookService) GetHotBooks(limit int) ([]*model.Book, error) {
 func (b *BookService) GetNewBooks(limit int) ([]*model.Book, error) {
 	return b.BookDB.GetNewBooks(limit)
 }
+
+func (b *BookService) GetBooksByPage(page, pageSize int) ([]*model.Book, int64, error) {
+	return b.BookDB.GetBooksByPage(page, pageSize)
+}
