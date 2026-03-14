@@ -114,3 +114,35 @@ func (b *BookController) SearchBooks(ctx *gin.Context) {
 		},
 	})
 }
+
+func (b *BookController) GetBookDetail(ctx *gin.Context) {
+	id := ctx.Param("id")
+	if id == "" {
+		ctx.JSON(400, gin.H{
+			"code":    -1,
+			"message": "无效的书籍ID",
+		})
+		return
+	}
+	intid, err := strconv.Atoi(id)
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"code":    -1,
+			"message": "无效的书籍ID",
+		})
+		return
+	}
+	book, err := b.BookService.GetBookDetail(intid)
+	if err != nil {
+		ctx.JSON(404, gin.H{
+			"code":    -1,
+			"message": "书籍不存在",
+		})
+		return
+	}
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"message": "查找书籍详情成功",
+		"data":    book,
+	})
+}

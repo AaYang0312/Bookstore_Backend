@@ -68,3 +68,12 @@ func (b *BookDAO) SearchBooksWithPage(keyword string, page, pageSize int) ([]*mo
 	}
 	return books, total, nil
 }
+func (b *BookDAO) GetBookDetail(id int) (*model.Book, error) {
+	var book *model.Book
+	// 获取详细信息
+	err := b.db.Debug().Where("status = ?", 1).First(&book, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return book, nil
+}
