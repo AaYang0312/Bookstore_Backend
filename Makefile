@@ -14,8 +14,8 @@ admin-manager:
 clean:
 	if exist $(BIN_DIR) rmdir /s /q $(BIN_DIR)
 
-run bookstore-manager:
+run-bookstore-manager:
 	$(TARGET)
 
-run admin-manager:
+run-admin-manager:
 	$(ADMIN_TARGET)

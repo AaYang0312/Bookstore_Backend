@@ -49,3 +49,22 @@ func (b *BookDAO) GetBooksByPage(page, pageSize int) ([]*model.Book, int64, erro
 	}
 	return books, total, nil
 }
+func (b *BookDAO) SearchBooksWithPage(keyword string, page, pageSize int) ([]*model.Book, int64, error) {
+	var books []*model.Book
+	var total int64
+	// 搜索
+	searchCondition := b.db.Debug().Where("status = ? AND (title LIKE ? OR author LIKE ? OR description LIKE ?)",
+		1, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	// 获取总数
+	err := searchCondition.Model(&model.Book{}).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	// 根据页数偏移量查找
+	offset := (page - 1) * pageSize
+	err = searchCondition.Offset(offset).Limit(pageSize).Find(&books).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return books, total, nil
+}
