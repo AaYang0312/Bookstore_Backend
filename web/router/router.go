@@ -54,6 +54,7 @@ func InitRouter() *gin.Engine {
 	userController := controller.NewUserController()
 	captchaController := controller.NewCaptchaController()
 	bookController := controller.NewBookController()
+	favoriteController := controller.NewFavoriteController()
 	v1 := r.Group("/api/v1")
 	{
 		user := v1.Group("/user")
@@ -77,6 +78,12 @@ func InitRouter() *gin.Engine {
 			book.GET("/list", bookController.GetBookList)
 			book.GET("/search", bookController.SearchBooks)
 			book.GET("/detail/:id", bookController.GetBookDetail)
+		}
+		favorite := v1.Group("/favorite")
+		favorite.Use(middleware.JWTAuthMiddleware())
+		{
+			favorite.POST("/:id", favoriteController.AddFavorite)
+			favorite.DELETE("/:id", favoriteController.DelFavorite)
 		}
 	}
 	captcha := v1.Group("/captcha")
