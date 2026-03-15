@@ -34,3 +34,11 @@ func (f *FavoriteDAO) DelFavorite(userID, bookID int) error {
 	}
 	return nil
 }
+func (f *FavoriteDAO) GetUserFavorites(userID int) ([]*model.Favorite, error) {
+	var fav []*model.Favorite
+	err := f.db.Debug().Preload("Book").Where("user_id = ?", userID).Find(&fav).Error
+	if err != nil {
+		return nil, err
+	}
+	return fav, nil
+}

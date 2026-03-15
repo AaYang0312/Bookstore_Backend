@@ -84,6 +84,7 @@ func InitRouter() *gin.Engine {
 		{
 			favorite.POST("/:id", favoriteController.AddFavorite)
 			favorite.DELETE("/:id", favoriteController.DelFavorite)
+			favorite.GET("/list", favoriteController.GetUserFavorites)
 		}
 	}
 	captcha := v1.Group("/captcha")

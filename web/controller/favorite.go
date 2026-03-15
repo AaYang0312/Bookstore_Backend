@@ -84,3 +84,35 @@ func (f *FavoriteController) DelFavorite(ctx *gin.Context) {
 		"message": "移除收藏成功",
 	})
 }
+func (f *FavoriteController) GetUserFavorites(ctx *gin.Context) {
+	userID := getUserID(ctx)
+	if userID == 0 {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"code":    -1,
+			"message": "用户未登录",
+		})
+		return
+	}
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "12"))
+	timeFilter := ctx.DefaultQuery("time_filter", "all")
+	favs, total, err := f.FavoriteService.GetUserFavorites(userID, page, pageSize, timeFilter)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"code":    -1,
+			"message": "获取收藏列表失败",
+		})
+		return
+	}
+	totalPages := (int(total) + pageSize - 1) / pageSize
+	ctx.JSON(200, gin.H{
+		"code":    0,
+		"message": "获取收藏列表成功",
+		"data": gin.H{
+			"favorites":    favs,
+			"total":        total,
+			"total_pages":  totalPages,
+			"current_page": page,
+		},
+	})
+}
