@@ -4,9 +4,12 @@ import (
 	"bookstore-manager/config"
 	"bookstore-manager/global"
 	"bookstore-manager/web/router"
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func main() {
@@ -28,4 +31,24 @@ func main() {
 		fmt.Println("服务器启动失败...")
 		os.Exit(-1)
 	}
+	err = server.Shutdown(context.TODO())
+	if err != nil {
+		log.Println("服务器错误退出", err)
+		cleanResources()
+	} else {
+		log.Println("服务器正常退出")
+		cleanResources()
+	}
+}
+func cleanResources() {
+	if global.RedisClient != nil {
+		log.Println("Redis 资源清理....")
+		global.CloseRedis()
+	}
+	if global.DBClient != nil {
+		log.Println("Mysql 资源清理....")
+		global.CloseDB()
+	}
+	time.Sleep(1 * time.Second)
+	log.Println("所有资源清理完毕！")
 }

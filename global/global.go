@@ -59,3 +59,8 @@ func CloseDB() {
 		}
 	}
 }
+func CloseRedis() {
+	if RedisClient != nil {
+		RedisClient.Close()
+	}
+}
