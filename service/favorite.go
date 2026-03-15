@@ -36,3 +36,9 @@ func (f *FavoriteService) GetUserFavorites(userID int, page, pageSize int, timeF
 	}
 	return fav[start:end], int64(total), nil
 }
+func (f *FavoriteService) GetUserFavoriteCount(userID int) (int64, error) {
+	return f.FavoriteDAO.GetUserFavoriteCount(userID)
+}
+func (f *FavoriteService) IsFavorite(userID, bookID int) (bool, error) {
+	return f.FavoriteDAO.IsFavorite(userID, bookID)
+}
