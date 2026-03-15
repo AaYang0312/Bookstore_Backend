@@ -9,11 +9,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 func main() {
-	// 初始化一些Mysql, 配置文件, redis
+	// 初始化一些 Mysql, 配置文件，redis
 	// 配置
 	config.InitConfig("conf/config.yaml")
 	global.InitMysql()
@@ -26,15 +28,31 @@ func main() {
 		Addr:    addr,
 		Handler: r,
 	}
-	err := server.ListenAndServe()
-	if err != nil {
-		fmt.Println("服务器启动失败...")
-		os.Exit(-1)
-	}
-	err = server.Shutdown(context.TODO())
+
+	// 启动服务器
+	go func() {
+		fmt.Printf("服务器启动在：%s\n", addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Println("服务器启动失败...")
+			log.Fatal(err)
+		}
+	}()
+
+	// 等待中断信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	fmt.Println("正在关闭服务器...")
+
+	// 优雅关闭服务器
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := server.Shutdown(ctx)
 	if err != nil {
 		log.Println("服务器错误退出", err)
 		cleanResources()
+		os.Exit(1)
 	} else {
 		log.Println("服务器正常退出")
 		cleanResources()
