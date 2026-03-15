@@ -5,15 +5,15 @@ import (
 )
 
 type Order struct {
-	ID          int       `gorm:"primaryKey" json:"id"`
-	UserID      int       `json:"user_id"`
-	OrderNo     string    `json:"order_no"` // 订单号
-	TotalAmount int       `json:"total_amount"`
-	Status      int       `json:"status"`  // 状态，0-待支付，1-已支付，2-已取消
-	IsPaid      bool      `json:"is_paid"` // 支付状态
-	PaymentTime time.Time `json:"payment_time"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int        `gorm:"primaryKey" json:"id"`
+	UserID      int        `json:"user_id"`
+	OrderNo     string     `json:"order_no"` // 订单号
+	TotalAmount int        `json:"total_amount"`
+	Status      int        `json:"status"`  // 状态，0-待支付，1-已支付，2-已取消
+	IsPaid      bool       `json:"is_paid"` // 支付状态
+	PaymentTime *time.Time `json:"payment_time"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 
 	// 关联字段
 	User       *User       `gorm:"foreignKey:UserID" json:"user"`

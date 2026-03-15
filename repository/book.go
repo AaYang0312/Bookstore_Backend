@@ -77,3 +77,13 @@ func (b *BookDAO) GetBookDetail(id int) (*model.Book, error) {
 	}
 	return book, nil
 }
+
+// GetBookByID 根据ID获取书籍（只返回上架状态）
+func (b *BookDAO) GetBookByID(id int) (*model.Book, error) {
+	var book model.Book
+	err := b.db.Where("status = ?", 1).First(&book, id).Error
+	if err != nil {
+	} else {
+	}
+	return &book, err
+}
