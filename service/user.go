@@ -4,9 +4,8 @@ import (
 	"bookstore-manager/jwt"
 	"bookstore-manager/model"
 	"bookstore-manager/repository"
+	"encoding/base64"
 	"errors"
-
-	"github.com/cloudwego/base64x"
 )
 
 type UserService struct {
@@ -86,7 +85,7 @@ func (u *UserService) UserLogin(username, password string) (*LoginResponse, erro
 
 // 小写开头，对外不可见
 func (u *UserService) encodePassword(password string) string {
-	return base64x.StdEncoding.EncodeToString([]byte(password))
+	return base64.StdEncoding.EncodeToString([]byte(password))
 }
 func (u *UserService) createUser(username, passwordHash, phone, email string) error {
 	user := &model.User{
