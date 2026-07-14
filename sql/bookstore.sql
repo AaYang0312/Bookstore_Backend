@@ -74,6 +74,7 @@ CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     order_no VARCHAR(50) NOT NULL COMMENT '订单号',
+    idempotency_key VARCHAR(64) NOT NULL COMMENT '客户端结算幂等键',
     total_amount INT NOT NULL COMMENT '总金额（元）',
     status TINYINT DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付，2-已取消',
     is_paid BOOLEAN DEFAULT FALSE COMMENT '是否已支付',
@@ -81,6 +82,7 @@ CREATE TABLE orders (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_order_no (order_no),
+    UNIQUE KEY uk_user_idempotency (user_id, idempotency_key),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -98,6 +98,24 @@ func (o *OrderController) GetUserOrders(ctx *gin.Context) {
 		},
 	})
 }
+func (o *OrderController) GetOrderDetail(ctx *gin.Context) {
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "无效的订单ID"})
+		return
+	}
+	userID := getUserID(ctx)
+	if userID == 0 {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"code": -1, "message": "用户未登录"})
+		return
+	}
+	order, err := o.OrderService.GetUserOrderByID(id, userID)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"code": -1, "message": "订单不存在"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "获取订单成功", "data": order})
+}
 func (o *OrderController) PayOrder(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -108,7 +126,13 @@ func (o *OrderController) PayOrder(c *gin.Context) {
 		return
 	}
 
-	err = o.OrderService.PayOrder(id)
+	userID := getUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": -1, "message": "用户未登录"})
+		return
+	}
+
+	err = o.OrderService.PayOrder(id, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    -1,

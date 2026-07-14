@@ -4,11 +4,13 @@ import (
 	"bookstore-manager/model"
 	"bookstore-manager/repository"
 	"errors"
+	"strings"
 )
 
 type CreateOrderRequest struct {
-	UserID int          `json:"user_id"`
-	Items  []OrderItems `json:"items"`
+	UserID         int          `json:"user_id"`
+	IdempotencyKey string       `json:"idempotency_key"`
+	Items          []OrderItems `json:"items"`
 }
 type OrderItems struct {
 	BookID   int `json:"book_id"`
@@ -27,8 +29,18 @@ func NewOrderService() *OrderService {
 	}
 }
 func (o *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error) {
+	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
+	if req.IdempotencyKey == "" {
+		return nil, errors.New("缺少幂等键")
+	}
+	if len(req.IdempotencyKey) > 64 {
+		return nil, errors.New("幂等键过长")
+	}
 	if len(req.Items) == 0 {
 		return nil, errors.New("订单项不能为空")
+	}
+	if existing, err := o.OrderDAO.GetOrderByIdempotencyKey(req.UserID, req.IdempotencyKey); err == nil {
+		return existing, nil
 	}
 
 	// 检查库存
@@ -58,16 +70,20 @@ func (o *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 
 	// 创建订单
 	order := &model.Order{
-		UserID:      req.UserID,
-		OrderNo:     orderNo,
-		TotalAmount: totalAmount,
-		Status:      0, // 待支付
-		IsPaid:      false,
+		UserID:         req.UserID,
+		OrderNo:        orderNo,
+		IdempotencyKey: req.IdempotencyKey,
+		TotalAmount:    totalAmount,
+		Status:         0, // 待支付
+		IsPaid:         false,
 	}
 
 	// 创建订单和订单项
 	err = o.OrderDAO.CreateOrderWithItems(order, orderItems)
 	if err != nil {
+		if existing, lookupErr := o.OrderDAO.GetOrderByIdempotencyKey(req.UserID, req.IdempotencyKey); lookupErr == nil {
+			return existing, nil
+		}
 		return nil, err
 	}
 
@@ -99,21 +115,15 @@ func (o *OrderService) GetUserOrders(userID int, page, pageSize int) ([]*model.O
 }
 
 // PayOrder 支付订单
-func (o *OrderService) PayOrder(orderID int) error {
-	// 检查订单是否存在
-	order, err := o.GetOrderByID(orderID)
-	if err != nil {
-		return err
-	}
-
-	// 检查订单是否已支付
-	if order.IsPaid {
-		return errors.New("订单已支付")
-	}
-	return o.OrderDAO.PayOrder(order)
+func (o *OrderService) PayOrder(orderID, userID int) error {
+	return o.OrderDAO.PayOrder(orderID, userID)
 }
 
 // GetOrderByID 根据ID获取订单
 func (o *OrderService) GetOrderByID(id int) (*model.Order, error) {
 	return o.OrderDAO.GetOrderByID(id)
+}
+
+func (o *OrderService) GetUserOrderByID(id, userID int) (*model.Order, error) {
+	return o.OrderDAO.GetOrderByUserAndID(id, userID)
 }

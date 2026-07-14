@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrderDAO struct {
@@ -36,6 +37,22 @@ func (o *OrderDAO) GetOrderByID(id int) (*model.Order, error) {
 	if err != nil {
 	} else {
 	}
+	return &order, err
+}
+
+func (o *OrderDAO) GetOrderByUserAndID(id, userID int) (*model.Order, error) {
+	var order model.Order
+	err := o.db.Preload("OrderItems.Book").
+		Where("id = ? AND user_id = ?", id, userID).
+		First(&order).Error
+	return &order, err
+}
+
+func (o *OrderDAO) GetOrderByIdempotencyKey(userID int, key string) (*model.Order, error) {
+	var order model.Order
+	err := o.db.Preload("OrderItems.Book").
+		Where("user_id = ? AND idempotency_key = ?", userID, key).
+		First(&order).Error
 	return &order, err
 }
 
@@ -75,10 +92,21 @@ func (o *OrderDAO) GetUserOrders(userID int, page, pageSize int) ([]*model.Order
 	return orders, total, nil
 }
 
-func (o *OrderDAO) PayOrder(order *model.Order) error {
+func (o *OrderDAO) PayOrder(orderID, userID int) error {
 	// 订单号、销量的更新、库存的减少、金额的更新、订单的状态（0/1）
 	// 使用事务处理支付和库存更新
 	err := o.db.Transaction(func(tx *gorm.DB) error {
+		var order model.Order
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Preload("OrderItems").
+			Where("id = ? AND user_id = ?", orderID, userID).
+			First(&order).Error; err != nil {
+			return err
+		}
+		if order.IsPaid {
+			return nil
+		}
+
 		// 再次检查库存（防止并发问题）
 		for _, item := range order.OrderItems {
 			var book model.Book
@@ -92,7 +120,7 @@ func (o *OrderDAO) PayOrder(order *model.Order) error {
 
 		// 标记订单为已支付
 		if err := tx.Model(&model.Order{}).
-			Where("id = ?", order.ID).
+			Where("id = ? AND user_id = ? AND is_paid = ?", order.ID, userID, false).
 			Updates(map[string]interface{}{
 				"status":       1,
 				"is_paid":      true,

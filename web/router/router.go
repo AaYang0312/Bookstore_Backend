@@ -97,6 +97,7 @@ func InitRouter() *gin.Engine {
 		{
 			order.POST("/create", orderController.CreateOrder)
 			order.GET("/list", orderController.GetUserOrders)
+			order.GET("/:id", orderController.GetOrderDetail)
 			order.POST("/:id/pay", orderController.PayOrder)
 		}
 		category := v1.Group("/category")
