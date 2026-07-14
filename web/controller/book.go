@@ -73,11 +73,11 @@ func (b *BookController) GetBookList(ctx *gin.Context) {
 		"code":    0,
 		"message": "获取书籍列表成功",
 		"data": gin.H{
-			"books":      books,
-			"total":      total,
-			"page":       page,
-			"page_size":  pageSize,
-			"total_size": (total + int64(pageSize) - 1) / int64(pageSize),
+			"books":       books,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
 		},
 	})
 }
@@ -106,11 +106,11 @@ func (b *BookController) SearchBooks(ctx *gin.Context) {
 		"code":    0,
 		"message": "搜索书籍成功",
 		"data": gin.H{
-			"books":      books,
-			"total":      total,
-			"page":       page,
-			"page_size":  pageSize,
-			"total_size": (total + int64(pageSize) - 1) / int64(pageSize),
+			"books":       books,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
 		},
 	})
 }
@@ -182,12 +182,14 @@ func (b *BookController) GetBooksByCategory(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"code":        0,
-		"message":     "获取分类图书成功",
-		"data":        books,
-		"total":       total,
-		"page":        page,
-		"page_size":   pageSize,
-		"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+		"code":    0,
+		"message": "获取分类图书成功",
+		"data": gin.H{
+			"books":       books,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+		},
 	})
 }
