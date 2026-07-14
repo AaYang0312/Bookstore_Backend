@@ -1,6 +1,6 @@
 # 博学书城后端
 
-博学书城后端是一个使用 Go 和 Gin 开发的 RESTful API 服务，为书城前端提供用户认证、图书查询、收藏、订单和验证码等功能。
+博学书城后端是一个使用 Go 和 Gin 开发的 RESTful API 服务，为书城前端提供用户认证、图书查询、分类浏览、首页轮播图、收藏、订单和验证码等功能。
 
 ## 技术栈
 
@@ -117,6 +117,9 @@ make run-bookstore-manager
 | 图书 | GET | `/book/list` | 否 |
 | 图书 | GET | `/book/search` | 否 |
 | 图书 | GET | `/book/detail/:id` | 否 |
+| 图书 | GET | `/book/category/:category` | 否 |
+| 分类 | GET | `/category/list` | 否 |
+| 轮播图 | GET | `/carousel/list` | 否 |
 | 收藏 | POST | `/favorite/:id` | 是 |
 | 收藏 | DELETE | `/favorite/:id` | 是 |
 | 收藏 | GET | `/favorite/list` | 是 |
@@ -141,10 +144,12 @@ Authorization: Bearer <access_token>
 
 后端已配置 CORS，可接受前端开发服务器发起的跨域请求。
 
+首页分类和轮播图依赖数据库中的 `categories`、`carousel` 数据。首次运行时，请先执行 `sql/bookstore.sql` 创建表，再执行 `sql/mock.sql` 写入示例数据。
+
 ## 注意事项
 
 - 配置文件路径是相对于当前工作目录的 `conf/config.yaml`，请从后端根目录启动程序。
-- 当前路由只注册了上表中的接口；若前端调用分类、轮播图、退出登录或订单详情接口，需要先在后端实现并注册对应路由。
+- 分类列表、按分类查询图书和首页轮播图接口已经实现。前端调用的退出登录和订单详情接口目前仍未注册，需要继续补充后端实现或调整前端调用。
 - 当前项目尚未配置自动化测试命令，修改业务逻辑后建议至少执行 `go test ./...` 和一次前后端联调。
 
 ## License
