@@ -146,3 +146,48 @@ func (b *BookController) GetBookDetail(ctx *gin.Context) {
 		"data":    book,
 	})
 }
+
+func (b *BookController) GetBooksByCategory(ctx *gin.Context) {
+	categoryName := ctx.Param("category")
+	if categoryName == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    -1,
+			"message": "分类名称不能为空",
+		})
+		return
+	}
+
+	page, err := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(ctx.DefaultQuery("page_size", "12"))
+	if err != nil || pageSize < 1 {
+		pageSize = 12
+	}
+
+	books, total, err := b.BookService.GetBooksByCategory(
+		categoryName,
+		page,
+		pageSize,
+	)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    -1,
+			"message": "获取分类图书失败",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":        0,
+		"message":     "获取分类图书成功",
+		"data":        books,
+		"total":       total,
+		"page":        page,
+		"page_size":   pageSize,
+		"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+	})
+}

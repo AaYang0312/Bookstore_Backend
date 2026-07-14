@@ -89,3 +89,7 @@ func (b *BookService) GetBookDetail(id int) (*model.Book, error) {
 	}
 	return val.(*model.Book), nil
 }
+
+func (b *BookService) GetBooksByCategory(categoryName string, page int, pageSize int) ([]*model.Book, int64, error) {
+	return b.BookDB.GetBooksByCategory(categoryName, page, pageSize)
+}

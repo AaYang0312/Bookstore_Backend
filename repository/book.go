@@ -87,3 +87,35 @@ func (b *BookDAO) GetBookByID(id int) (*model.Book, error) {
 	}
 	return &book, err
 }
+
+func (b *BookDAO) GetBooksByCategory(
+	categoryName string,
+	page int,
+	pageSize int,
+) ([]*model.Book, int64, error) {
+	var books []*model.Book
+	var total int64
+
+	query := b.db.Model(&model.Book{}).
+		Joins("JOIN categories ON categories.id = books.category_id").
+		Where("books.status = ? AND categories.is_active = ? AND categories.name = ?",
+			1,
+			true,
+			categoryName,
+		)
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+
+	if err := query.
+		Offset(offset).
+		Limit(pageSize).
+		Find(&books).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return books, total, nil
+}
