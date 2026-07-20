@@ -193,3 +193,5 @@ func (b *BookController) GetBooksByCategory(ctx *gin.Context) {
 		},
 	})
 }
+
+func (b *BookController)AdminGetBookList

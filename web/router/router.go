@@ -60,6 +60,51 @@ func InitRouter() *gin.Engine {
 	carouselController := controller.NewCarouselController()
 	v1 := r.Group("/api/v1")
 	{
+		admin := v1.Group("/admin")
+		admin.Use(middleware.JWTAuthMiddleware(), middleware.AdminRequired())
+		{
+			// TODO: 后续补充对应的 controller handler。
+			admin.GET("/dashboard")
+
+			adminBook := admin.Group("/books")
+			{
+				adminBook.GET("")
+				adminBook.POST("")
+				adminBook.PUT("/:id")
+				adminBook.PATCH("/:id/status")
+				adminBook.PATCH("/:id/stock")
+			}
+
+			adminCategory := admin.Group("/categories")
+			{
+				adminCategory.GET("")
+				adminCategory.POST("")
+				adminCategory.PUT("/:id")
+				adminCategory.PATCH("/:id/status")
+			}
+
+			adminOrder := admin.Group("/orders")
+			{
+				adminOrder.GET("")
+				adminOrder.GET("/:id")
+				adminOrder.PATCH("/:id/status")
+			}
+
+			adminUser := admin.Group("/users")
+			{
+				adminUser.GET("")
+				adminUser.PATCH("/:id/role")
+			}
+
+			adminCarousel := admin.Group("/carousel")
+			{
+				adminCarousel.GET("")
+				adminCarousel.POST("")
+				adminCarousel.PUT("/:id")
+				adminCarousel.DELETE("/:id")
+				adminCarousel.PATCH("/:id/status")
+			}
+		}
 		user := v1.Group("/user")
 		{
 			user.POST("/register", userController.UserRegister)
