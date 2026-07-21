@@ -25,38 +25,41 @@ func NewBookService() *BookService {
 }
 
 func (b *BookService) GetHotBooks(limit int) ([]*model.Book, error) {
-	if books, ok := b.BookCache.GetHotBooks(limit); ok {
+	books, version, found := b.BookCache.GetHotBooks(limit)
+	if found {
 		return books, nil
 	}
 	books, err := b.BookDB.GetHotBooks(limit)
 	if err != nil {
 		return nil, err
 	}
-	b.BookCache.SetHotBooks(limit, books)
+	b.BookCache.SetHotBooks(limit, version, books)
 	return books, nil
 }
 
 func (b *BookService) GetNewBooks(limit int) ([]*model.Book, error) {
-	if books, ok := b.BookCache.GetNewBooks(limit); ok {
+	books, version, found := b.BookCache.GetNewBooks(limit)
+	if found {
 		return books, nil
 	}
 	books, err := b.BookDB.GetNewBooks(limit)
 	if err != nil {
 		return nil, err
 	}
-	b.BookCache.SetNewBooks(limit, books)
+	b.BookCache.SetNewBooks(limit, version, books)
 	return books, nil
 }
 
 func (b *BookService) GetBooksByPage(page, pageSize int) ([]*model.Book, int64, error) {
-	if books, total, ok := b.BookCache.GetBookList(page, pageSize); ok {
+	books, total, version, found := b.BookCache.GetBookList(page, pageSize)
+	if found {
 		return books, total, nil
 	}
 	books, total, err := b.BookDB.GetBooksByPage(page, pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	b.BookCache.SetBookList(page, pageSize, books, total)
+	b.BookCache.SetBookList(page, pageSize, version, books, total)
 	return books, total, nil
 }
 

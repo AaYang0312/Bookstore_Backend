@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	bookDetailKey = "book:detail:%d"
-	bookHotKey    = "book:hot:%d"
-	bookNewKey    = "book:new:%d"
-	bookListKey   = "book:list:%d:%d"
+	bookCacheVersionKey = "book:cache:version"
+	bookDetailKey       = "book:detail:%d"
+	bookHotKey          = "book:hot:v%d:%d"
+	bookNewKey          = "book:new:v%d:%d"
+	bookListKey         = "book:list:v%d:%d:%d"
 
 	bookDetailTTL = 10 * time.Minute
 	bookListTTL   = 5 * time.Minute
@@ -81,20 +82,30 @@ func (c *BookCache) DoWithSingleFlight(key string, fn func() (any, error)) (any,
 	return val, err
 }
 
-func (c *BookCache) GetHotBooks(limit int) ([]*model.Book, bool) {
-	return c.getBookSlice(fmt.Sprintf(bookHotKey, limit))
+func (c *BookCache) GetHotBooks(limit int) ([]*model.Book, int64, bool) {
+	version := c.collectionVersion()
+	books, found := c.getBookSlice(hotBooksCacheKey(version, limit))
+	return books, version, found
 }
 
-func (c *BookCache) SetHotBooks(limit int, books []*model.Book) {
-	c.setBookSlice(fmt.Sprintf(bookHotKey, limit), books, bookListTTL)
+func (c *BookCache) SetHotBooks(limit int, version int64, books []*model.Book) {
+	if c.collectionVersion() != version {
+		return
+	}
+	c.setBookSlice(hotBooksCacheKey(version, limit), books, bookListTTL)
 }
 
-func (c *BookCache) GetNewBooks(limit int) ([]*model.Book, bool) {
-	return c.getBookSlice(fmt.Sprintf(bookNewKey, limit))
+func (c *BookCache) GetNewBooks(limit int) ([]*model.Book, int64, bool) {
+	version := c.collectionVersion()
+	books, found := c.getBookSlice(newBooksCacheKey(version, limit))
+	return books, version, found
 }
 
-func (c *BookCache) SetNewBooks(limit int, books []*model.Book) {
-	c.setBookSlice(fmt.Sprintf(bookNewKey, limit), books, bookListTTL)
+func (c *BookCache) SetNewBooks(limit int, version int64, books []*model.Book) {
+	if c.collectionVersion() != version {
+		return
+	}
+	c.setBookSlice(newBooksCacheKey(version, limit), books, bookListTTL)
 }
 
 type bookListResult struct {
@@ -102,21 +113,47 @@ type bookListResult struct {
 	Total int64         `json:"total"`
 }
 
-func (c *BookCache) GetBookList(page, pageSize int) ([]*model.Book, int64, bool) {
-	val, err := c.rdb.Get(c.ctx, fmt.Sprintf(bookListKey, page, pageSize)).Result()
+func (c *BookCache) GetBookList(page, pageSize int) ([]*model.Book, int64, int64, bool) {
+	version := c.collectionVersion()
+	val, err := c.rdb.Get(c.ctx, bookListCacheKey(version, page, pageSize)).Result()
 	if err != nil {
-		return nil, 0, false
+		return nil, 0, version, false
 	}
 	var result bookListResult
 	if err := json.Unmarshal([]byte(val), &result); err != nil {
-		return nil, 0, false
+		return nil, 0, version, false
 	}
-	return result.Books, result.Total, true
+	return result.Books, result.Total, version, true
 }
 
-func (c *BookCache) SetBookList(page, pageSize int, books []*model.Book, total int64) {
+func (c *BookCache) SetBookList(page, pageSize int, version int64, books []*model.Book, total int64) {
+	if c.collectionVersion() != version {
+		return
+	}
 	data, _ := json.Marshal(bookListResult{Books: books, Total: total})
-	c.rdb.Set(c.ctx, fmt.Sprintf(bookListKey, page, pageSize), data, jitter(bookListTTL))
+	c.rdb.Set(c.ctx, bookListCacheKey(version, page, pageSize), data, jitter(bookListTTL))
+}
+
+func hotBooksCacheKey(version int64, limit int) string {
+	return fmt.Sprintf(bookHotKey, version, limit)
+}
+
+func newBooksCacheKey(version int64, limit int) string {
+	return fmt.Sprintf(bookNewKey, version, limit)
+}
+
+func bookListCacheKey(version int64, page, pageSize int) string {
+	return fmt.Sprintf(bookListKey, version, page, pageSize)
+}
+
+// collectionVersion 返回当前图书集合缓存版本。版本键不存在或 Redis
+// 暂时不可用时使用 0；首次失效时 INCR 会将版本推进到 1。
+func (c *BookCache) collectionVersion() int64 {
+	version, err := c.rdb.Get(c.ctx, bookCacheVersionKey).Int64()
+	if err != nil {
+		return 0
+	}
+	return version
 }
 
 func (c *BookCache) getBookSlice(key string) ([]*model.Book, bool) {
@@ -136,25 +173,12 @@ func (c *BookCache) setBookSlice(key string, books []*model.Book, ttl time.Durat
 	c.rdb.Set(c.ctx, key, data, jitter(ttl))
 }
 
-// InvalidateBook 清理图书写操作会影响到的详情和列表缓存。
+// InvalidateBook 删除单本详情缓存并推进集合缓存版本。旧版本的列表、
+// 热销和新书缓存不再被读取，等待 TTL 自动过期，无需扫描 Redis Key。
 func (c *BookCache) InvalidateBook(id int) {
-	patterns := []string{"book:list:*", "book:hot:*", "book:new:*"}
-	keys := []string{fmt.Sprintf(bookDetailKey, id)}
-	for _, pattern := range patterns {
-		var cursor uint64
-		for {
-			matched, next, err := c.rdb.Scan(c.ctx, cursor, pattern, 100).Result()
-			if err != nil {
-				break
-			}
-			keys = append(keys, matched...)
-			cursor = next
-			if cursor == 0 {
-				break
-			}
-		}
-	}
-	if len(keys) > 0 {
-		c.rdb.Del(c.ctx, keys...)
-	}
+	_, _ = c.rdb.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		pipe.Incr(c.ctx, bookCacheVersionKey)
+		pipe.Del(c.ctx, fmt.Sprintf(bookDetailKey, id))
+		return nil
+	})
 }

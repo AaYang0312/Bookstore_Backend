@@ -4,6 +4,7 @@ import (
 	"bookstore-manager/web/controller"
 	"bookstore-manager/web/middleware"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -59,6 +60,14 @@ func InitRouter() *gin.Engine {
 	categoryController := controller.NewCategoryController()
 	carouselController := controller.NewCarouselController()
 	adminController := controller.NewAdminController()
+
+	adminWriteLimit := middleware.RedisRateLimit(
+		"admin-write:user",
+		30,
+		time.Minute,
+		middleware.UserIDKey,
+	)
+
 	v1 := r.Group("/api/v1")
 	{
 		admin := v1.Group("/admin")
@@ -69,9 +78,17 @@ func InitRouter() *gin.Engine {
 			adminBook := admin.Group("/books")
 			{
 				adminBook.GET("", bookController.AdminListBooksHandler)
-				adminBook.POST("", bookController.AdminCreateBookHandler)
-				adminBook.PUT("/:id", bookController.AdminUpdateBookHandler)
-				adminBook.PATCH("/:id/status", bookController.AdminUpdateBookStatusHandler)
+				adminBook.POST("", adminWriteLimit, bookController.AdminCreateBookHandler)
+
+				adminBook.PUT("/:id",
+					adminWriteLimit,
+					bookController.AdminUpdateBookHandler,
+				)
+
+				adminBook.PATCH("/:id/status",
+					adminWriteLimit,
+					bookController.AdminUpdateBookStatusHandler,
+				)
 				adminBook.PATCH("/:id/stock", bookController.AdminUpdateBookStockHandler)
 			}
 
@@ -108,7 +125,16 @@ func InitRouter() *gin.Engine {
 		user := v1.Group("/user")
 		{
 			user.POST("/register", userController.UserRegister)
-			user.POST("/login", userController.UserLogin)
+			user.POST(
+				"/login",
+				middleware.RedisRateLimit(
+					"login:ip",
+					10,
+					time.Minute,
+					middleware.IPKey,
+				),
+				userController.UserLogin,
+			)
 		}
 		auth := user.Group("")
 		{
@@ -124,7 +150,16 @@ func InitRouter() *gin.Engine {
 			book.GET("/hot", bookController.GetHotBooks)
 			book.GET("/new", bookController.GetNewBooks)
 			book.GET("/list", bookController.GetBookList)
-			book.GET("/search", bookController.SearchBooks)
+			book.GET(
+				"/search",
+				middleware.RedisRateLimit(
+					"search:ip",
+					10,
+					time.Second,
+					middleware.IPKey,
+				),
+				bookController.SearchBooks,
+			)
 			book.GET("/detail/:id", bookController.GetBookDetail)
 			book.GET("/category/:category", bookController.GetBooksByCategory)
 		}
@@ -140,7 +175,16 @@ func InitRouter() *gin.Engine {
 		order := v1.Group("/order")
 		order.Use(middleware.JWTAuthMiddleware())
 		{
-			order.POST("/create", orderController.CreateOrder)
+			order.POST(
+				"/create",
+				middleware.RedisRateLimit(
+					"order:user",
+					3,
+					time.Second,
+					middleware.UserIDKey,
+				),
+				orderController.CreateOrder,
+			)
 			order.GET("/list", orderController.GetUserOrders)
 			order.GET("/:id", orderController.GetOrderDetail)
 			order.POST("/:id/pay", orderController.PayOrder)
@@ -156,7 +200,16 @@ func InitRouter() *gin.Engine {
 	}
 	captcha := v1.Group("/captcha")
 	{
-		captcha.GET("/generate", captchaController.GenerateCaptcha)
+		captcha.GET(
+			"/generate",
+			middleware.RedisRateLimit(
+				"captcha:ip",
+				10,
+				time.Minute,
+				middleware.IPKey,
+			),
+			captchaController.GenerateCaptcha,
+		)
 	}
 	return r
 }
