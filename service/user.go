@@ -6,6 +6,7 @@ import (
 	"bookstore-manager/repository"
 	"encoding/base64"
 	"errors"
+	"strings"
 )
 
 type UserService struct {
@@ -23,7 +24,11 @@ type UserInfo struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Phone    string `json:"phone"`
+	Avatar   string `json:"avatar"`
+	IsAdmin  bool   `json:"is_admin"`
 }
+
+var ErrCannotRevokeOwnAdmin = errors.New("不能取消自己的管理员权限")
 
 // service --> repository --> 调用 db 方法(操作 model 里的模型)
 func NewUserService() *UserService {
@@ -78,6 +83,8 @@ func (u *UserService) UserLogin(username, password string) (*LoginResponse, erro
 			Username: user.Username,
 			Email:    user.Email,
 			Phone:    user.Phone,
+			Avatar:   user.Avatar,
+			IsAdmin:  user.IsAdmin,
 		},
 	}
 	return response, nil
@@ -137,4 +144,18 @@ func (u *UserService) ChangePassword(userID int, oldPassword, newPassword string
 	// 操作数据库修改密码
 	user.Password = u.encodePassword(newPassword)
 	return u.UserDB.ChangePassword(user)
+}
+
+func (u *UserService) AdminGetUsers(keyword string, page, pageSize int) ([]*repository.AdminUser, int64, error) {
+	return u.UserDB.GetAdminUsers(strings.TrimSpace(keyword), page, pageSize)
+}
+
+func (u *UserService) AdminUpdateRole(operatorID, userID int, isAdmin bool) (*repository.AdminUser, error) {
+	if operatorID == userID && !isAdmin {
+		return nil, ErrCannotRevokeOwnAdmin
+	}
+	if err := u.UserDB.UpdateAdminRole(userID, isAdmin); err != nil {
+		return nil, err
+	}
+	return u.UserDB.GetAdminUserByID(userID)
 }

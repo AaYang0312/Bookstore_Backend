@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrBookCategoryNotFound = errors.New("图书分类不存在")
+
 type BookService struct {
 	BookDB    *repository.BookDAO
 	BookCache *cache.BookCache
@@ -92,4 +94,76 @@ func (b *BookService) GetBookDetail(id int) (*model.Book, error) {
 
 func (b *BookService) GetBooksByCategory(categoryName string, page int, pageSize int) ([]*model.Book, int64, error) {
 	return b.BookDB.GetBooksByCategory(categoryName, page, pageSize)
+}
+
+func (b *BookService) AdminGetBooks(keyword string, status *int, page, pageSize int) ([]*repository.AdminBook, int64, error) {
+	return b.BookDB.GetAdminBooks(keyword, status, page, pageSize)
+}
+
+func (b *BookService) AdminCreateBook(book *model.Book, categoryName string) (*repository.AdminBook, error) {
+	if err := b.resolveCategory(book, categoryName); err != nil {
+		return nil, err
+	}
+	if book.Language == "" {
+		book.Language = "中文"
+	}
+	if book.Format == "" {
+		book.Format = "平装"
+	}
+	if err := b.BookDB.CreateBook(book); err != nil {
+		return nil, err
+	}
+	b.BookCache.InvalidateBook(book.ID)
+	return b.BookDB.GetAdminBookByID(book.ID)
+}
+
+func (b *BookService) AdminUpdateBook(book *model.Book, categoryName string) (*repository.AdminBook, error) {
+	if _, err := b.BookDB.GetAdminBookByID(book.ID); err != nil {
+		return nil, err
+	}
+	if err := b.resolveCategory(book, categoryName); err != nil {
+		return nil, err
+	}
+	if book.Language == "" {
+		book.Language = "中文"
+	}
+	if book.Format == "" {
+		book.Format = "平装"
+	}
+	if err := b.BookDB.UpdateBook(book); err != nil {
+		return nil, err
+	}
+	b.BookCache.InvalidateBook(book.ID)
+	return b.BookDB.GetAdminBookByID(book.ID)
+}
+
+func (b *BookService) AdminUpdateBookStatus(id, status int) (*repository.AdminBook, error) {
+	if err := b.BookDB.UpdateBookStatus(id, status); err != nil {
+		return nil, err
+	}
+	b.BookCache.InvalidateBook(id)
+	return b.BookDB.GetAdminBookByID(id)
+}
+
+func (b *BookService) AdminUpdateBookStock(id, stock int) (*repository.AdminBook, error) {
+	if err := b.BookDB.UpdateBookStock(id, stock); err != nil {
+		return nil, err
+	}
+	b.BookCache.InvalidateBook(id)
+	return b.BookDB.GetAdminBookByID(id)
+}
+
+func (b *BookService) resolveCategory(book *model.Book, categoryName string) error {
+	if categoryName == "" {
+		return nil
+	}
+	categoryID, err := b.BookDB.GetCategoryIDByName(categoryName)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrBookCategoryNotFound
+		}
+		return err
+	}
+	book.CategoryID = categoryID
+	return nil
 }

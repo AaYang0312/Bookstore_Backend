@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var ErrPaidOrderStatusLocked = errors.New("已支付订单不能直接改为待支付或已取消")
+
 type CreateOrderRequest struct {
 	UserID         int          `json:"user_id"`
 	IdempotencyKey string       `json:"idempotency_key"`
@@ -126,4 +128,38 @@ func (o *OrderService) GetOrderByID(id int) (*model.Order, error) {
 
 func (o *OrderService) GetUserOrderByID(id, userID int) (*model.Order, error) {
 	return o.OrderDAO.GetOrderByUserAndID(id, userID)
+}
+
+func (o *OrderService) AdminGetOrders(keyword string, status *int, page, pageSize int) ([]*repository.AdminOrder, int64, error) {
+	return o.OrderDAO.GetAdminOrders(strings.TrimSpace(keyword), status, page, pageSize)
+}
+
+func (o *OrderService) AdminGetOrderByID(id int) (*model.Order, error) {
+	return o.OrderDAO.GetAdminOrderByID(id)
+}
+
+func (o *OrderService) AdminUpdateOrderStatus(id, status int) (*model.Order, error) {
+	if status < 0 || status > 2 {
+		return nil, errors.New("订单状态只能是0、1或2")
+	}
+	order, err := o.OrderDAO.GetAdminOrderByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if order.Status == status {
+		return order, nil
+	}
+	if order.IsPaid && status != 1 {
+		return nil, ErrPaidOrderStatusLocked
+	}
+	if status == 1 {
+		if err := o.OrderDAO.PayOrder(id, order.UserID); err != nil {
+			return nil, err
+		}
+		return o.OrderDAO.GetAdminOrderByID(id)
+	}
+	if err := o.OrderDAO.UpdateAdminOrderStatus(id, status); err != nil {
+		return nil, err
+	}
+	return o.OrderDAO.GetAdminOrderByID(id)
 }

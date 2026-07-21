@@ -58,51 +58,51 @@ func InitRouter() *gin.Engine {
 	orderController := controller.NewOrderController()
 	categoryController := controller.NewCategoryController()
 	carouselController := controller.NewCarouselController()
+	adminController := controller.NewAdminController()
 	v1 := r.Group("/api/v1")
 	{
 		admin := v1.Group("/admin")
 		admin.Use(middleware.JWTAuthMiddleware(), middleware.AdminRequired())
 		{
-			// TODO: 后续补充对应的 controller handler。
-			admin.GET("/dashboard")
+			admin.GET("/dashboard", adminController.GetDashboard)
 
 			adminBook := admin.Group("/books")
 			{
-				adminBook.GET("")
-				adminBook.POST("")
-				adminBook.PUT("/:id")
-				adminBook.PATCH("/:id/status")
-				adminBook.PATCH("/:id/stock")
+				adminBook.GET("", bookController.AdminListBooksHandler)
+				adminBook.POST("", bookController.AdminCreateBookHandler)
+				adminBook.PUT("/:id", bookController.AdminUpdateBookHandler)
+				adminBook.PATCH("/:id/status", bookController.AdminUpdateBookStatusHandler)
+				adminBook.PATCH("/:id/stock", bookController.AdminUpdateBookStockHandler)
 			}
 
 			adminCategory := admin.Group("/categories")
 			{
-				adminCategory.GET("")
-				adminCategory.POST("")
-				adminCategory.PUT("/:id")
-				adminCategory.PATCH("/:id/status")
+				adminCategory.GET("", categoryController.AdminListCategories)
+				adminCategory.POST("", categoryController.AdminCreateCategory)
+				adminCategory.PUT("/:id", categoryController.AdminUpdateCategory)
+				adminCategory.PATCH("/:id/status", categoryController.AdminUpdateCategoryStatus)
 			}
 
 			adminOrder := admin.Group("/orders")
 			{
-				adminOrder.GET("")
-				adminOrder.GET("/:id")
-				adminOrder.PATCH("/:id/status")
+				adminOrder.GET("", orderController.AdminListOrders)
+				adminOrder.GET("/:id", orderController.AdminGetOrder)
+				adminOrder.PATCH("/:id/status", orderController.AdminUpdateOrderStatus)
 			}
 
 			adminUser := admin.Group("/users")
 			{
-				adminUser.GET("")
-				adminUser.PATCH("/:id/role")
+				adminUser.GET("", userController.AdminListUsers)
+				adminUser.PATCH("/:id/role", userController.AdminUpdateUserRole)
 			}
 
 			adminCarousel := admin.Group("/carousel")
 			{
-				adminCarousel.GET("")
-				adminCarousel.POST("")
-				adminCarousel.PUT("/:id")
-				adminCarousel.DELETE("/:id")
-				adminCarousel.PATCH("/:id/status")
+				adminCarousel.GET("", carouselController.AdminListCarousels)
+				adminCarousel.POST("", carouselController.AdminCreateCarousel)
+				adminCarousel.PUT("/:id", carouselController.AdminUpdateCarousel)
+				adminCarousel.DELETE("/:id", carouselController.AdminDeleteCarousel)
+				adminCarousel.PATCH("/:id/status", carouselController.AdminUpdateCarouselStatus)
 			}
 		}
 		user := v1.Group("/user")

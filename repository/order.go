@@ -15,6 +15,21 @@ type OrderDAO struct {
 	db *gorm.DB
 }
 
+// AdminOrder 是管理端订单列表使用的扁平结构。
+type AdminOrder struct {
+	ID          int        `json:"id"`
+	OrderNo     string     `json:"order_no"`
+	UserID      int        `json:"user_id"`
+	Username    string     `json:"username"`
+	TotalAmount int        `json:"total_amount"`
+	Status      int        `json:"status"`
+	IsPaid      bool       `json:"is_paid"`
+	ItemCount   int        `json:"item_count"`
+	PaymentTime *time.Time `json:"payment_time"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
 func NewOrderDAO() *OrderDAO {
 	return &OrderDAO{
 		db: global.GetDB(),
@@ -90,6 +105,67 @@ func (o *OrderDAO) GetUserOrders(userID int, page, pageSize int) ([]*model.Order
 		return nil, 0, err
 	}
 	return orders, total, nil
+}
+
+func (o *OrderDAO) GetAdminOrders(keyword string, status *int, page, pageSize int) ([]*AdminOrder, int64, error) {
+	var orders []*AdminOrder
+	var total int64
+
+	query := o.db.Model(&model.Order{}).Joins("LEFT JOIN users ON users.id = orders.user_id")
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("orders.order_no LIKE ? OR users.username LIKE ?", like, like)
+	}
+	if status != nil {
+		query = query.Where("orders.status = ?", *status)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	err := query.
+		Select(`orders.id, orders.order_no, orders.user_id, users.username,
+			orders.total_amount, orders.status, orders.is_paid, orders.payment_time,
+			orders.created_at, orders.updated_at,
+			(SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE order_id = orders.id) AS item_count`).
+		Order("orders.created_at DESC").Offset(offset).Limit(pageSize).Scan(&orders).Error
+	return orders, total, err
+}
+
+func (o *OrderDAO) GetAdminOrderByID(id int) (*model.Order, error) {
+	var order model.Order
+	err := o.db.Preload("User").Preload("OrderItems.Book").First(&order, id).Error
+	if err != nil {
+		return nil, err
+	}
+	if order.User != nil {
+		order.User.Password = ""
+	}
+	return &order, nil
+}
+
+func (o *OrderDAO) UpdateAdminOrderStatus(id, status int) error {
+	updates := map[string]any{"status": status, "is_paid": status == 1}
+	if status == 1 {
+		updates["payment_time"] = gorm.Expr("COALESCE(payment_time, NOW())")
+	} else {
+		updates["payment_time"] = nil
+	}
+	result := o.db.Model(&model.Order{}).Where("id = ?", id).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := o.db.Model(&model.Order{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+	}
+	return nil
 }
 
 func (o *OrderDAO) PayOrder(orderID, userID int) error {

@@ -135,3 +135,26 @@ func (c *BookCache) setBookSlice(key string, books []*model.Book, ttl time.Durat
 	data, _ := json.Marshal(books)
 	c.rdb.Set(c.ctx, key, data, jitter(ttl))
 }
+
+// InvalidateBook 清理图书写操作会影响到的详情和列表缓存。
+func (c *BookCache) InvalidateBook(id int) {
+	patterns := []string{"book:list:*", "book:hot:*", "book:new:*"}
+	keys := []string{fmt.Sprintf(bookDetailKey, id)}
+	for _, pattern := range patterns {
+		var cursor uint64
+		for {
+			matched, next, err := c.rdb.Scan(c.ctx, cursor, pattern, 100).Result()
+			if err != nil {
+				break
+			}
+			keys = append(keys, matched...)
+			cursor = next
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+	if len(keys) > 0 {
+		c.rdb.Del(c.ctx, keys...)
+	}
+}

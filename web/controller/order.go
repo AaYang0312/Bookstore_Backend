@@ -2,10 +2,13 @@ package controller
 
 import (
 	"bookstore-manager/service"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type OrderController struct {
@@ -146,4 +149,79 @@ func (o *OrderController) PayOrder(c *gin.Context) {
 		"code":    0,
 		"message": "支付成功",
 	})
+}
+
+func (o *OrderController) AdminListOrders(ctx *gin.Context) {
+	page := parseAdminPositiveQuery(ctx, "page", 1)
+	pageSize := parseAdminPositiveQuery(ctx, "page_size", 20)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	var status *int
+	if raw := strings.TrimSpace(ctx.Query("status")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 0 || value > 2 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "订单状态只能是0、1或2"})
+			return
+		}
+		status = &value
+	}
+	orders, total, err := o.OrderService.AdminGetOrders(ctx.Query("keyword"), status, page, pageSize)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": "获取订单列表失败", "error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "获取订单列表成功", "data": gin.H{
+		"orders": orders, "total": total, "page": page, "page_size": pageSize,
+		"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+	}})
+}
+
+func (o *OrderController) AdminGetOrder(ctx *gin.Context) {
+	id, ok := parseAdminResourceID(ctx, "订单")
+	if !ok {
+		return
+	}
+	order, err := o.OrderService.AdminGetOrderByID(id)
+	if err != nil {
+		writeAdminOrderError(ctx, "获取订单详情失败", err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "获取订单详情成功", "data": order})
+}
+
+func (o *OrderController) AdminUpdateOrderStatus(ctx *gin.Context) {
+	id, ok := parseAdminResourceID(ctx, "订单")
+	if !ok {
+		return
+	}
+	var req struct {
+		Status *int `json:"status"`
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil || req.Status == nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "请求参数错误，缺少status"})
+		return
+	}
+	order, err := o.OrderService.AdminUpdateOrderStatus(id, *req.Status)
+	if err != nil {
+		writeAdminOrderError(ctx, "更新订单状态失败", err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新订单状态成功", "data": order})
+}
+
+func writeAdminOrderError(ctx *gin.Context, message string, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		ctx.JSON(http.StatusNotFound, gin.H{"code": -1, "message": "订单不存在"})
+		return
+	}
+	if err.Error() == "订单状态只能是0、1或2" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+	if errors.Is(err, service.ErrPaidOrderStatusLocked) {
+		ctx.JSON(http.StatusConflict, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": message, "error": err.Error()})
 }

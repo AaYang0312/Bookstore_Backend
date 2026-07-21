@@ -3,9 +3,12 @@ package controller
 import (
 	"bookstore-manager/model"
 	"bookstore-manager/service"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // 给 controller 对象做归属
@@ -144,6 +147,7 @@ func (u *UserController) GetUserProfile(ctx *gin.Context) {
 		"email":      user.Email,
 		"phone":      user.Phone,
 		"avatar":     user.Avatar,
+		"is_admin":   user.IsAdmin,
 		"created_at": user.CreatedAt.Format("2006-01-02 15:04:05"),
 		"updated_at": user.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}
@@ -152,6 +156,55 @@ func (u *UserController) GetUserProfile(ctx *gin.Context) {
 		"data":    response,
 		"message": "获取用户信息成功",
 	})
+}
+
+func (u *UserController) AdminListUsers(ctx *gin.Context) {
+	page := parseAdminPositiveQuery(ctx, "page", 1)
+	pageSize := parseAdminPositiveQuery(ctx, "page_size", 20)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	users, total, err := u.UserService.AdminGetUsers(strings.TrimSpace(ctx.Query("keyword")), page, pageSize)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": "获取用户列表失败", "error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "获取用户列表成功", "data": gin.H{
+		"users": users, "total": total, "page": page, "page_size": pageSize,
+		"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+	}})
+}
+
+func (u *UserController) AdminUpdateUserRole(ctx *gin.Context) {
+	id, ok := parseAdminResourceID(ctx, "用户")
+	if !ok {
+		return
+	}
+	var req struct {
+		IsAdmin *bool `json:"is_admin"`
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil || req.IsAdmin == nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "请求参数错误，缺少is_admin"})
+		return
+	}
+	operatorID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"code": -1, "message": "未登录"})
+		return
+	}
+	user, err := u.UserService.AdminUpdateRole(operatorID.(int), id, *req.IsAdmin)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			ctx.JSON(http.StatusNotFound, gin.H{"code": -1, "message": "用户不存在"})
+		case errors.Is(err, service.ErrCannotRevokeOwnAdmin):
+			ctx.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": err.Error()})
+		default:
+			ctx.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": "更新用户角色失败", "error": err.Error()})
+		}
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新用户角色成功", "data": user})
 }
 func (u *UserController) UpdateUserProfile(ctx *gin.Context) {
 	userID, exists := ctx.Get("userID")
