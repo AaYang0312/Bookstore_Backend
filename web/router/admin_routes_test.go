@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +52,23 @@ func TestAdminRoutesRequireAuthentication(t *testing.T) {
 
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("未登录访问管理端应返回401，实际返回%d", recorder.Code)
+	}
+}
+
+func TestAdminPatchPreflightIsAllowed(t *testing.T) {
+	router := InitRouter()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodOptions, "/api/v1/admin/books/1/status", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", http.MethodPatch)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("PATCH预检请求应返回204，实际返回%d", recorder.Code)
+	}
+	allowedMethods := recorder.Header().Get("Access-Control-Allow-Methods")
+	if !strings.Contains(allowedMethods, http.MethodPatch) {
+		t.Fatalf("CORS允许方法缺少PATCH: %q", allowedMethods)
 	}
 }

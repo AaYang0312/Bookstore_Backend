@@ -25,7 +25,7 @@ func InitRouter() *gin.Engine {
 
 		// 2. 设置允许的 HTTP 方法
 		c.Header("Access-Control-Allow-Methods",
-			"GET, POST, PUT, DELETE, OPTIONS")
+			"GET, POST, PUT, PATCH, DELETE, OPTIONS")
 
 		// 3. 设置允许的请求头
 		c.Header("Access-Control-Allow-Headers",
