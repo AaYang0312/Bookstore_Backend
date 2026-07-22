@@ -22,7 +22,7 @@ func main() {
 	global.InitRedis()
 
 	r := router.InitRouter()
-	addr := fmt.Sprintf("%s:%d", "localhost", config.AppConfig.Server.Port)
+	addr := fmt.Sprintf("%s:%d", config.AppConfig.Server.Host, config.AppConfig.Server.Port)
 
 	server := &http.Server{
 		Addr:    addr,

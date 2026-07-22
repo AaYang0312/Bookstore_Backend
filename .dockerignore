@@ -1,0 +1,6 @@
+.git
+.idea
+.claude
+.DS_Store
+bin
+*.log

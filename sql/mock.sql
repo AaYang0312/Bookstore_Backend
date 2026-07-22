@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 -- 插入分类数据
 INSERT INTO categories (name, description, icon, color, gradient, sort, is_active, book_count) VALUES
 ('科幻', '科幻小说和未来科技', '🚀', '#FF6B6B', 'linear-gradient(135deg, #FF6B6B, #FF8E8E)', 1, 1, 0),

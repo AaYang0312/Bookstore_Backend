@@ -50,6 +50,8 @@ Bookstore_Backend/
 - MySQL
 - Redis
 
+如果只需要快速体验完整系统，也可以只安装 Docker Desktop，直接使用后文的 Docker Compose 方案。
+
 ## 本地运行
 
 ### 1. 初始化数据库
@@ -110,6 +112,48 @@ make run-bookstore-manager
 make bookstore-manager
 make run-bookstore-manager
 ```
+
+## Docker 快速部署
+
+### 构建后端镜像
+
+在本目录执行：
+
+```bash
+docker build -t bookstore-backend .
+```
+
+镜像使用多阶段构建，运行阶段以非 root 用户启动，并内置接口健康检查。单独运行镜像时需要提供可访问的 MySQL 和 Redis；容器里的 `127.0.0.1` 指向容器自身，不能用来访问宿主机服务。
+
+后端支持用环境变量覆盖 `conf/config.yaml`，Docker 部署常用配置如下：
+
+| 环境变量 | 说明 | Compose 中的值 |
+| --- | --- | --- |
+| `BOOKSTORE_SERVER_HOST` | 服务监听地址 | `0.0.0.0` |
+| `BOOKSTORE_SERVER_PORT` | 服务端口 | `8080` |
+| `BOOKSTORE_DATABASE_HOST` | MySQL 主机 | `mysql` |
+| `BOOKSTORE_DATABASE_PORT` | MySQL 端口 | `3306` |
+| `BOOKSTORE_DATABASE_USER` | MySQL 用户 | `root` |
+| `BOOKSTORE_DATABASE_PASSWORD` | MySQL 密码 | 从部署环境文件读取 |
+| `BOOKSTORE_DATABASE_NAME` | 数据库名 | `bookstore` |
+| `BOOKSTORE_REDIS_HOST` | Redis 主机 | `redis` |
+| `BOOKSTORE_REDIS_PORT` | Redis 端口 | `6379` |
+| `BOOKSTORE_REDIS_PASSWORD` | Redis 密码 | 默认为空 |
+| `BOOKSTORE_REDIS_DB` | Redis DB | `0` |
+
+### 一键启动完整书城
+
+完整编排文件位于前端仓库。它会同时构建前端、Go 后端和 Agent，并启动 MySQL、Redis：
+
+```bash
+cd ../bookstore-fronted-master
+cp .env.docker.example .env.docker
+# 编辑 .env.docker，填写真实模型密钥
+docker compose --env-file .env.docker up --build -d
+docker compose ps
+```
+
+页面地址为 `http://localhost:3000`，Go API 为 `http://localhost:8080/api/v1`。数据库建表脚本和示例数据只会在 MySQL 数据卷首次创建时自动导入。
 
 ## 开发管理员账户
 
@@ -225,6 +269,7 @@ REACT_APP_API_BASE_URL=http://localhost:8080/api/v1
 ## 注意事项
 
 - 配置文件路径是相对于当前工作目录的 `conf/config.yaml`，请从后端根目录启动程序。
+- 本地默认只监听 `localhost`；Docker Compose 会通过 `BOOKSTORE_SERVER_HOST=0.0.0.0` 让服务可被其他容器访问。
 - MySQL 和 Redis 都是启动必需依赖；Redis 用于图书缓存和验证码答案存储。
 - 分类列表、按分类查询图书、首页轮播图、用户订单详情和管理后台接口均已注册。
 - 当前没有独立的后端退出登录接口。前端退出时删除本地令牌；如需服务端令牌撤销，需要继续实现黑名单或会话机制。
