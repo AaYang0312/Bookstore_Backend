@@ -234,6 +234,7 @@ func (u *UserController) UpdateUserProfile(ctx *gin.Context) {
 		Username: updateData.Username,
 		Email:    updateData.Email,
 		Phone:    updateData.Phone,
+		Avatar:   updateData.Avatar,
 	}
 	if err := u.UserService.UpdateUserInfo(user); err != nil {
 		ctx.JSON(500, gin.H{
