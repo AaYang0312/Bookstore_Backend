@@ -5,6 +5,7 @@ import (
 	"bookstore-manager/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FavoriteDAO struct {
@@ -21,7 +22,11 @@ func (f *FavoriteDAO) AddFavorite(userID, bookID int) error {
 		UserID: userID,
 		BookID: bookID,
 	}
-	err := f.db.Debug().Create(favorite).Error
+	// 命中唯一键 unique_user_book 时忽略，保证消息重投/重复发送幂等
+	err := f.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "book_id"}},
+		DoNothing: true,
+	}).Create(favorite).Error
 	if err != nil {
 		return err
 	}

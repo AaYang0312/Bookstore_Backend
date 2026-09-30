@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bookstore-manager/service"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -41,17 +42,21 @@ func (f *FavoriteController) AddFavorite(ctx *gin.Context) {
 		})
 		return
 	}
-	err = f.FavoriteService.AddFavorite(userID, bookID)
+	err = f.FavoriteService.AddFavorite(ctx.Request.Context(), userID, bookID)
 	if err != nil {
+		message := "添加收藏失败"
+		if errors.Is(err, service.ErrMQUnavailable) {
+			message = "收藏服务繁忙，请稍后重试"
+		}
 		ctx.JSON(500, gin.H{
 			"code":    -1,
-			"message": "添加收藏失败",
+			"message": message,
 		})
 		return
 	}
 	ctx.JSON(200, gin.H{
 		"code":    0,
-		"message": "添加收藏成功",
+		"message": "收藏请求已受理",
 	})
 }
 func (f *FavoriteController) DelFavorite(ctx *gin.Context) {
@@ -71,17 +76,21 @@ func (f *FavoriteController) DelFavorite(ctx *gin.Context) {
 		})
 		return
 	}
-	err = f.FavoriteService.DelFavorite(userID, bookID)
+	err = f.FavoriteService.DelFavorite(ctx.Request.Context(), userID, bookID)
 	if err != nil {
+		message := "移除收藏失败"
+		if errors.Is(err, service.ErrMQUnavailable) {
+			message = "收藏服务繁忙，请稍后重试"
+		}
 		ctx.JSON(500, gin.H{
 			"code":    -1,
-			"message": "移除收藏失败",
+			"message": message,
 		})
 		return
 	}
 	ctx.JSON(200, gin.H{
 		"code":    0,
-		"message": "移除收藏成功",
+		"message": "移除收藏请求已受理",
 	})
 }
 func (f *FavoriteController) GetUserFavorites(ctx *gin.Context) {
@@ -157,7 +166,7 @@ func (f *FavoriteController) CheckFavorite(ctx *gin.Context) {
 		})
 		return
 	}
-	isFavorite, err := f.FavoriteService.IsFavorite(userID, bookID)
+	isFavorite, err := f.FavoriteService.IsFavorite(ctx.Request.Context(), userID, bookID)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"code":    -1,

@@ -25,20 +25,26 @@ func main() {
 	global.InitRedis()
 	storage.InitMinIO()
 
-	// Kafka：确保 topic 存在，初始化全局生产者
+	// Kafka：确保 topic 存在，初始化全局生产者（订单 + 收藏）
 	if err := mq.EnsureTopic(); err != nil {
 		log.Fatalln("Kafka 初始化失败：", err)
 	}
 	mq.InitProducer()
+	mq.InitFavoriteProducer()
 
-	// 后台任务：下单消息消费者 + 超时关单定时任务
+	// 后台任务：下单/收藏消息消费者 + 超时关单定时任务
 	orderService := service.NewOrderService()
+	favoriteService := service.NewFavoriteService()
 	workerCtx, stopWorkers := context.WithCancel(context.Background())
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
 	go func() {
 		defer workers.Done()
 		mq.StartOrderConsumer(workerCtx, orderService.HandleOrderCreate)
+	}()
+	go func() {
+		defer workers.Done()
+		mq.StartFavoriteConsumer(workerCtx, favoriteService.HandleFavoriteEvent)
 	}()
 	go func() {
 		defer workers.Done()
@@ -83,6 +89,7 @@ func main() {
 	stopWorkers()
 	workers.Wait()
 	mq.CloseProducer()
+	mq.CloseFavoriteProducer()
 
 	log.Println("服务器正常退出")
 	cleanResources()
