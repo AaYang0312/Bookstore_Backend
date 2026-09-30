@@ -60,6 +60,7 @@ func InitRouter() *gin.Engine {
 	categoryController := controller.NewCategoryController()
 	carouselController := controller.NewCarouselController()
 	adminController := controller.NewAdminController()
+	uploadController := controller.NewUploadController()
 
 	adminWriteLimit := middleware.RedisRateLimit(
 		"admin-write:user",
@@ -74,6 +75,9 @@ func InitRouter() *gin.Engine {
 		admin.Use(middleware.JWTAuthMiddleware(), middleware.AdminRequired())
 		{
 			admin.GET("/dashboard", adminController.GetDashboard)
+
+			// 图片上传（MinIO）：type 为 covers（书籍封面）/ carousel（轮播图）
+			admin.POST("/upload/image", adminWriteLimit, uploadController.AdminUploadImage)
 
 			adminBook := admin.Group("/books")
 			{
@@ -185,9 +189,12 @@ func InitRouter() *gin.Engine {
 				),
 				orderController.CreateOrder,
 			)
+			// 下单结果轮询接口，需注册在 /:id 之前以便静态路由优先生效
+			order.GET("/create/result", orderController.GetOrderCreateResult)
 			order.GET("/list", orderController.GetUserOrders)
 			order.GET("/:id", orderController.GetOrderDetail)
 			order.POST("/:id/pay", orderController.PayOrder)
+			order.POST("/:id/cancel", orderController.CancelOrder)
 		}
 		category := v1.Group("/category")
 		{

@@ -94,6 +94,18 @@ func (b *BookDAO) GetBookByID(id int) (*model.Book, error) {
 	return &book, err
 }
 
+// GetBooksByIDs 按 ID 批量查询图书（含已下架，供订单消费者校验）
+func (b *BookDAO) GetBooksByIDs(ids []int) ([]*model.Book, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var books []*model.Book
+	if err := b.db.Where("id IN ?", ids).Find(&books).Error; err != nil {
+		return nil, err
+	}
+	return books, nil
+}
+
 func (b *BookDAO) GetBooksByCategory(
 	categoryName string,
 	page int,

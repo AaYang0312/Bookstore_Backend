@@ -14,3 +14,19 @@ redis:
   port: 6379
   password: ""
   db: 0
+
+kafka:
+  brokers:
+    - 127.0.0.1:9092
+  topic: order-create
+  group_id: order-service
+
+minio:
+  endpoint: 127.0.0.1:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  bucket: bookstore
+  use_ssl: false
+  # 返回给浏览器访问图片的地址（与 SDK 内部连接的 endpoint 分离）
+  public_base_url: http://localhost:9000
+

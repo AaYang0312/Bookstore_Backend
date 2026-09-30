@@ -3,6 +3,9 @@ package main
 import (
 	"bookstore-manager/config"
 	"bookstore-manager/global"
+	"bookstore-manager/mq"
+	"bookstore-manager/service"
+	"bookstore-manager/storage"
 	"bookstore-manager/web/router"
 	"context"
 	"fmt"
@@ -10,16 +13,37 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
 
 func main() {
-	// 初始化一些 Mysql, 配置文件，redis
-	// 配置
+	// 初始化配置、Mysql、Redis、MinIO
 	config.InitConfig("conf/config.yaml")
 	global.InitMysql()
 	global.InitRedis()
+	storage.InitMinIO()
+
+	// Kafka：确保 topic 存在，初始化全局生产者
+	if err := mq.EnsureTopic(); err != nil {
+		log.Fatalln("Kafka 初始化失败：", err)
+	}
+	mq.InitProducer()
+
+	// 后台任务：下单消息消费者 + 超时关单定时任务
+	orderService := service.NewOrderService()
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	var workers sync.WaitGroup
+	workers.Add(2)
+	go func() {
+		defer workers.Done()
+		mq.StartOrderConsumer(workerCtx, orderService.HandleOrderCreate)
+	}()
+	go func() {
+		defer workers.Done()
+		orderService.StartOrderTimeoutWorker(workerCtx)
+	}()
 
 	r := router.InitRouter()
 	addr := fmt.Sprintf("%s:%d", config.AppConfig.Server.Host, config.AppConfig.Server.Port)
@@ -53,10 +77,15 @@ func main() {
 		log.Println("服务器错误退出", err)
 		cleanResources()
 		os.Exit(1)
-	} else {
-		log.Println("服务器正常退出")
-		cleanResources()
 	}
+
+	// 停止后台任务（消费者、定时关单），再关闭生产者
+	stopWorkers()
+	workers.Wait()
+	mq.CloseProducer()
+
+	log.Println("服务器正常退出")
+	cleanResources()
 }
 func cleanResources() {
 	if global.RedisClient != nil {

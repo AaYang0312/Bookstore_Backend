@@ -21,16 +21,6 @@ func NewOrderController() *OrderController {
 	}
 }
 
-type CreateOrderRequest struct {
-	UserID int          `json:"user_id"`
-	Items  []OrderItems `json:"items"`
-}
-type OrderItems struct {
-	BookID   int `json:"book_id"`
-	Quantity int `json:"quantity"`
-	Price    int `json:"price"`
-}
-
 func (o *OrderController) CreateOrder(c *gin.Context) {
 	var req service.CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -53,22 +43,82 @@ func (o *OrderController) CreateOrder(c *gin.Context) {
 	}
 	req.UserID = userID.(int)
 
-	order, err := o.OrderService.CreateOrder(&req)
+	// 异步下单：消息进入 Kafka 后立即返回，前端轮询 /order/create/result 获取结果
+	result, err := o.OrderService.SubmitOrder(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		status := http.StatusBadRequest
+		if errors.Is(err, service.ErrMQUnavailable) {
+			status = http.StatusServiceUnavailable
+		}
+		c.JSON(status, gin.H{
 			"code":    -1,
-			"message": "创建订单失败",
-			"error":   err.Error(),
+			"message": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	if result.Status == service.OrderCreateCreated {
+		c.JSON(http.StatusOK, gin.H{
+			"code":    0,
+			"data":    result,
+			"message": "订单已创建",
+		})
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{
 		"code":    0,
-		"data":    order,
-		"message": "创建订单成功",
+		"data":    result,
+		"message": "订单已受理，正在处理",
 	})
 }
+
+// GetOrderCreateResult 查询异步下单结果，前端在提交订单后轮询该接口。
+func (o *OrderController) GetOrderCreateResult(c *gin.Context) {
+	key := strings.TrimSpace(c.Query("idempotency_key"))
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "缺少幂等键"})
+		return
+	}
+	userID := getUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": -1, "message": "用户未登录"})
+		return
+	}
+	result, err := o.OrderService.GetCreateResult(c.Request.Context(), userID, key)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "查询成功",
+		"data":    result,
+	})
+}
+
+// CancelOrder 用户取消订单（仅待支付）。
+func (o *OrderController) CancelOrder(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": "无效的订单ID"})
+		return
+	}
+	userID := getUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": -1, "message": "用户未登录"})
+		return
+	}
+	if err := o.OrderService.UserCancelOrder(id, userID); err != nil {
+		if errors.Is(err, service.ErrOrderNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"code": -1, "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusConflict, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "订单已取消"})
+}
+
 func (o *OrderController) GetUserOrders(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))

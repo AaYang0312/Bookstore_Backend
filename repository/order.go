@@ -223,6 +223,29 @@ func (o *OrderDAO) PayOrder(orderID, userID int) error {
 	return err
 }
 
+// CancelOrder 条件取消订单：仅当订单仍处于待支付状态时生效，
+// 条件更新避免与并发支付/管理端操作互相覆盖。
+func (o *OrderDAO) CancelOrder(orderID, userID int) (bool, error) {
+	result := o.db.Model(&model.Order{}).
+		Where("id = ? AND user_id = ? AND status = ?", orderID, userID, 0).
+		Update("status", 2)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+// CancelExpiredOrders 批量取消超时未支付的订单，返回取消数量。
+func (o *OrderDAO) CancelExpiredOrders(deadline time.Time) (int64, error) {
+	result := o.db.Model(&model.Order{}).
+		Where("status = ? AND created_at < ?", 0, deadline).
+		Update("status", 2)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
 // GenerateOrderNo 生成订单号
 func (o *OrderDAO) GenerateOrderNo() string {
 	orderNo := fmt.Sprintf("ORD%d", time.Now().UnixNano())

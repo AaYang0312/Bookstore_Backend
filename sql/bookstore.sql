@@ -46,7 +46,7 @@ CREATE TABLE books (
     stock INT DEFAULT 0,
     status TINYINT(1) DEFAULT 1 COMMENT '图书状态：0-下架，1-上架',
     description TEXT,
-    cover_url VARCHAR(255),
+    cover_url VARCHAR(500),
     isbn VARCHAR(20),
     publisher VARCHAR(100),
     publish_date VARCHAR(50),
