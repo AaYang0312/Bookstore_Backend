@@ -9,6 +9,7 @@
 - GORM 1.31
 - MySQL 8.x
 - Redis 6.x 或更高版本
+- Kafka 3.x（订单与收藏异步链路）
 - JWT
 
 ## 功能模块
@@ -16,8 +17,8 @@
 - 用户：注册、登录、查看及修改个人资料、修改密码
 - 图书：首页列表、热销图书、新书、搜索、分类查询和详情
 - 首页：分类导航和轮播图
-- 收藏：添加、取消、列表、数量和收藏状态
-- 订单：创建订单、订单列表、订单详情和支付
+- 收藏：添加、取消、列表、数量和收藏状态（写路径经 Kafka 异步落库）
+- 订单：创建订单、订单列表、订单详情和支付（创建经 Kafka 异步处理）
 - 验证码：生成图片验证码，并使用 Redis 保存有效期为 3 分钟的答案
 - 管理后台：数据看板、图书管理、分类管理、订单管理、用户权限和轮播图管理
 
@@ -49,6 +50,7 @@ Bookstore_Backend/
 - Go 1.25 或与 `go.mod` 兼容的版本
 - MySQL
 - Redis
+- Kafka（默认 `127.0.0.1:9092`，业务 topic 启动时自动创建）
 
 如果只需要快速体验完整系统，也可以只安装 Docker Desktop，直接使用后文的 Docker Compose 方案。
 
@@ -65,7 +67,7 @@ mysql -u root -p bookstore < sql/mock.sql
 
 ### 2. 修改配置
 
-编辑 `conf/config.yaml`，填写本机的服务端口、MySQL 和 Redis 连接信息：
+编辑 `conf/config.yaml`，填写本机的服务端口、MySQL、Redis 和 Kafka 连接信息：
 
 ```yaml
 server:
@@ -83,6 +85,14 @@ redis:
   port: 6379
   password: ""
   db: 0
+
+kafka:
+  brokers:
+    - 127.0.0.1:9092
+  topic: order-create
+  group_id: order-service
+  favorite_topic: favorite-events
+  favorite_group_id: favorite-service
 ```
 
 请勿将生产环境密码提交到版本库。
@@ -113,6 +123,31 @@ make bookstore-manager
 make run-bookstore-manager
 ```
 
+## Kafka 异步链路
+
+订单创建与收藏写路径均通过 Kafka 异步落库，服务启动时会自动创建以下 topic（3 分区、1 副本、消息保留 24 小时）：
+
+| Topic | 用途 | 消费组 |
+| --- | --- | --- |
+| `order-create` | 下单请求异步建单 | `order-service` |
+| `favorite-events` | 收藏添加/取消事件异步落库 | `favorite-service` |
+
+两条链路均以 `userID` 作为消息分区键：同一用户的消息严格有序。Kafka 连接与 topic 均可用环境变量覆盖：
+
+| 环境变量 | 说明 | 默认值 |
+| --- | --- | --- |
+| `BOOKSTORE_KAFKA_BROKERS` | Broker 地址列表（逗号分隔） | `127.0.0.1:9092` |
+| `BOOKSTORE_KAFKA_TOPIC` | 下单 topic | `order-create` |
+| `BOOKSTORE_KAFKA_GROUP_ID` | 下单消费组 | `order-service` |
+| `BOOKSTORE_KAFKA_FAVORITE_TOPIC` | 收藏事件 topic | `favorite-events` |
+| `BOOKSTORE_KAFKA_FAVORITE_GROUP_ID` | 收藏消费组 | `favorite-service` |
+
+### 收藏一致性模型与已知限制
+
+- `POST/DELETE /favorite/:id` 返回"已受理"即表示消息已进入 Kafka；落库由消费者异步完成（通常为秒级）。
+- 发送成功后接口会写入 Redis pending 标记（`fav:pending:{userID}`，TTL 10 分钟），`GET /favorite/:id/check` 在数据库结果之上叠加 pending，保证"点完收藏立刻刷新"不会回显旧状态。
+- **已知限制**：`GET /favorite/list` 与 `GET /favorite/count` 只读数据库，不叠加 pending，存在秒级最终一致窗口（前端已有乐观更新覆盖会话内体验）。若 Kafka 不可用，收藏接口返回"收藏服务繁忙，请稍后重试"，不会回退为同步写库。
+
 ## Docker 快速部署
 
 ### 构建后端镜像
@@ -140,6 +175,9 @@ docker build -t bookstore-backend .
 | `BOOKSTORE_REDIS_PORT` | Redis 端口 | `6379` |
 | `BOOKSTORE_REDIS_PASSWORD` | Redis 密码 | 默认为空 |
 | `BOOKSTORE_REDIS_DB` | Redis DB | `0` |
+| `BOOKSTORE_KAFKA_BROKERS` | Kafka broker 地址列表 | 宿主机 Kafka 地址 |
+
+> Compose 编排未内置 Kafka。容器内运行时需通过 `BOOKSTORE_KAFKA_BROKERS` 指向宿主机或其他可达的 Kafka 集群。
 
 ### 一键启动完整书城
 
@@ -270,7 +308,8 @@ REACT_APP_API_BASE_URL=http://localhost:8080/api/v1
 
 - 配置文件路径是相对于当前工作目录的 `conf/config.yaml`，请从后端根目录启动程序。
 - 本地默认只监听 `localhost`；Docker Compose 会通过 `BOOKSTORE_SERVER_HOST=0.0.0.0` 让服务可被其他容器访问。
-- MySQL 和 Redis 都是启动必需依赖；Redis 用于图书缓存和验证码答案存储。
+- MySQL、Redis 和 Kafka 都是启动必需依赖；Redis 用于图书缓存、验证码答案存储和收藏 pending 标记，Kafka 用于订单与收藏的异步写路径。
+- 收藏列表与数量的读接口存在秒级最终一致窗口（见「Kafka 异步链路」一节）；`check` 接口已通过 pending 叠加消除该窗口。
 - 分类列表、按分类查询图书、首页轮播图、用户订单详情和管理后台接口均已注册。
 - 当前没有独立的后端退出登录接口。前端退出时删除本地令牌；如需服务端令牌撤销，需要继续实现黑名单或会话机制。
 - 路由和 Repository 已包含自动化测试。修改后端后应执行：
