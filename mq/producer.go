@@ -46,9 +46,17 @@ func NewOrderProducer() *OrderProducer {
 	return &OrderProducer{writer: writer}
 }
 
-// EnsureTopic 启动时确保 topic 存在：3 分区、1 副本、消息保留 24 小时。
+// EnsureTopic 启动时确保全部业务 topic（下单、收藏事件）存在。
 // topic 已存在时 CreateTopics 会返回错误，直接忽略。
 func EnsureTopic() error {
+	if err := ensureTopic(config.AppConfig.Kafka.Topic); err != nil {
+		return err
+	}
+	return ensureTopic(config.AppConfig.Kafka.FavoriteTopic)
+}
+
+// ensureTopic 确保单个 topic 存在：3 分区、1 副本、消息保留 24 小时。
+func ensureTopic(name string) error {
 	kafkaCfg := config.AppConfig.Kafka
 	conn, err := kafka.Dial("tcp", kafkaCfg.Brokers[0])
 	if err != nil {
@@ -67,7 +75,7 @@ func EnsureTopic() error {
 	defer controllerConn.Close()
 
 	err = controllerConn.CreateTopics(kafka.TopicConfig{
-		Topic:             kafkaCfg.Topic,
+		Topic:             name,
 		NumPartitions:     3,
 		ReplicationFactor: 1,
 		ConfigEntries: []kafka.ConfigEntry{
@@ -75,9 +83,9 @@ func EnsureTopic() error {
 		},
 	})
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		return fmt.Errorf("创建 topic %s 失败: %w", kafkaCfg.Topic, err)
+		return fmt.Errorf("创建 topic %s 失败: %w", name, err)
 	}
-	log.Printf("Kafka topic 就绪: %s (brokers: %v)", kafkaCfg.Topic, kafkaCfg.Brokers)
+	log.Printf("Kafka topic 就绪: %s (brokers: %v)", name, kafkaCfg.Brokers)
 	return nil
 }
 

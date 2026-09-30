@@ -29,9 +29,11 @@ type RedisConfig struct {
 	DB       int    `yaml:"db"`
 }
 type KafkaConfig struct {
-	Brokers []string `yaml:"brokers"`
-	Topic   string   `yaml:"topic"`
-	GroupID string   `yaml:"group_id"`
+	Brokers         []string `yaml:"brokers"`
+	Topic           string   `yaml:"topic"`
+	GroupID         string   `yaml:"group_id"`
+	FavoriteTopic   string   `yaml:"favorite_topic"`
+	FavoriteGroupID string   `yaml:"favorite_group_id"`
 }
 type MinIOConfig struct {
 	Endpoint      string `yaml:"endpoint"`
@@ -80,6 +82,8 @@ func applyEnvironmentOverrides() {
 	overrideStringSlice("BOOKSTORE_KAFKA_BROKERS", &AppConfig.Kafka.Brokers)
 	overrideString("BOOKSTORE_KAFKA_TOPIC", &AppConfig.Kafka.Topic)
 	overrideString("BOOKSTORE_KAFKA_GROUP_ID", &AppConfig.Kafka.GroupID)
+	overrideString("BOOKSTORE_KAFKA_FAVORITE_TOPIC", &AppConfig.Kafka.FavoriteTopic)
+	overrideString("BOOKSTORE_KAFKA_FAVORITE_GROUP_ID", &AppConfig.Kafka.FavoriteGroupID)
 	overrideString("BOOKSTORE_MINIO_ENDPOINT", &AppConfig.MinIO.Endpoint)
 	overrideString("BOOKSTORE_MINIO_ACCESS_KEY", &AppConfig.MinIO.AccessKey)
 	overrideString("BOOKSTORE_MINIO_SECRET_KEY", &AppConfig.MinIO.SecretKey)
@@ -99,6 +103,12 @@ func applyEnvironmentOverrides() {
 	}
 	if AppConfig.Kafka.GroupID == "" {
 		AppConfig.Kafka.GroupID = "order-service"
+	}
+	if AppConfig.Kafka.FavoriteTopic == "" {
+		AppConfig.Kafka.FavoriteTopic = "favorite-events"
+	}
+	if AppConfig.Kafka.FavoriteGroupID == "" {
+		AppConfig.Kafka.FavoriteGroupID = "favorite-service"
 	}
 	if AppConfig.MinIO.Bucket == "" {
 		AppConfig.MinIO.Bucket = "bookstore"

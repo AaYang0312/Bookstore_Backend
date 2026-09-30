@@ -20,6 +20,8 @@ kafka:
     - 127.0.0.1:9092
   topic: order-create
   group_id: order-service
+  favorite_topic: favorite-events
+  favorite_group_id: favorite-service
 
 minio:
   endpoint: 127.0.0.1:9000
