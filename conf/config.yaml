@@ -30,3 +30,8 @@ minio:
   # 返回给浏览器访问图片的地址（与 SDK 内部连接的 endpoint 分离）
   public_base_url: http://localhost:9000
 
+internal:
+  # Agent 向量库增量同步接口（GET /internal/books/sync）共享密钥；
+  # 为空时该接口禁用。生产环境必须改为强随机值
+  sync_secret: ""
+

@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bookstore-manager/config"
 	"bookstore-manager/jwt"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -68,44 +70,67 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// OptionalAuthMiddleware 可选认证中间件（用于可选登录的接口）
-//func OptionalAuthMiddleware() gin.HandlerFunc {
-//	return func(c *gin.Context) {
-//		// 从请求头获取token
-//		authHeader := c.GetHeader("Authorization")
-//		if authHeader == "" {
-//			// 如果没有token，继续处理请求
-//			c.Next()
-//			return
-//		}
-//
-//		// 检查Bearer前缀
-//		tokenParts := strings.SplitN(authHeader, " ", 2)
-//		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-//			// token格式错误，但不中断请求
-//			c.Next()
-//			return
-//		}
-//
-//		tokenString := tokenParts[1]
-//
-//		// 解析并验证token
-//		claims, err := jwt.ParseToken(tokenString)
-//		if err != nil {
-//			// token无效，但不中断请求
-//			c.Next()
-//			return
-//		}
-//
-//		// 检查token类型
-//		if claims.TokenType == "access" {
-//			// 将用户信息存储到上下文中
-//			c.Set("userID", int(claims.UserID))
-//			c.Set("username", claims.Username)
-//			c.Set("authenticated", true)
-//		}
-//
-//		// 继续处理请求
-//		c.Next()
-//	}
-//}
+// OptionalAuthMiddleware 可选认证：有合法 token 时把用户信息写入上下文，
+// 无 token 或 token 无效时静默放行（用于公开接口的顺带埋点等场景）
+func OptionalAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.Next()
+			return
+		}
+
+		// 检查Bearer前缀
+		tokenParts := strings.SplitN(authHeader, " ", 2)
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			c.Next()
+			return
+		}
+
+		tokenString := tokenParts[1]
+
+		// 解析并验证token
+		claims, err := jwt.ParseToken(tokenString)
+		if err != nil {
+			// token无效，但不中断请求
+			c.Next()
+			return
+		}
+
+		// 检查token类型
+		if claims.TokenType == "access" {
+			// 将用户信息存储到上下文中
+			c.Set("userID", int(claims.UserID))
+			c.Set("username", claims.Username)
+			c.Set("authenticated", true)
+		}
+
+		// 继续处理请求
+		c.Next()
+	}
+}
+
+// InternalSyncAuth 内部同步接口共享密钥校验：密钥未配置视为接口禁用
+func InternalSyncAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		secret := config.AppConfig.Internal.SyncSecret
+		if secret == "" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    -1,
+				"message": "内部同步接口未启用",
+			})
+			c.Abort()
+			return
+		}
+		token := c.GetHeader("X-Internal-Token")
+		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    -1,
+				"message": "无效的内部同步凭据",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}

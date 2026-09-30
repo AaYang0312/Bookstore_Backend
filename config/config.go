@@ -41,12 +41,16 @@ type MinIOConfig struct {
 	UseSSL        bool   `yaml:"use_ssl"`
 	PublicBaseURL string `yaml:"public_base_url"`
 }
+type InternalConfig struct {
+	SyncSecret string `yaml:"sync_secret"`
+}
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
 	Kafka    KafkaConfig    `yaml:"kafka"`
 	MinIO    MinIOConfig    `yaml:"minio"`
+	Internal InternalConfig `yaml:"internal"`
 }
 
 func InitConfig(path string) {
@@ -82,6 +86,7 @@ func applyEnvironmentOverrides() {
 	overrideString("BOOKSTORE_MINIO_BUCKET", &AppConfig.MinIO.Bucket)
 	overrideBool("BOOKSTORE_MINIO_USE_SSL", &AppConfig.MinIO.UseSSL)
 	overrideString("BOOKSTORE_MINIO_PUBLIC_BASE_URL", &AppConfig.MinIO.PublicBaseURL)
+	overrideString("BOOKSTORE_INTERNAL_SYNC_SECRET", &AppConfig.Internal.SyncSecret)
 
 	if AppConfig.Server.Host == "" {
 		AppConfig.Server.Host = "localhost"

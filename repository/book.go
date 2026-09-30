@@ -3,6 +3,8 @@ package repository
 import (
 	"bookstore-manager/global"
 	"bookstore-manager/model"
+	"database/sql"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -192,6 +194,48 @@ func (b *BookDAO) GetCategoryIDByName(name string) (uint, error) {
 		return 0, err
 	}
 	return uint(category.ID), nil
+}
+
+// GetBooksForSync 内部只读同步接口的数据查询：
+// 按 updated_at 水位增量拉取全部图书（含下架，status 字段原样返回，由调用方决定写入/删除），
+// 附带分类名；nextSince 返回本批数据的最大 updated_at，作为下一轮增量水位。
+func (b *BookDAO) GetBooksForSync(since *time.Time, page, pageSize int) ([]*AdminBook, int64, time.Time, error) {
+	var books []*AdminBook
+	var total int64
+
+	// 每个阶段都基于全新 query 构建，避免语句复用导致 JOIN 重复
+	baseQuery := func() *gorm.DB {
+		query := b.db.Model(&model.Book{}).
+			Joins("LEFT JOIN categories ON categories.id = books.category_id")
+		if since != nil {
+			query = query.Where("books.updated_at > ?", *since)
+		}
+		return query
+	}
+
+	if err := baseQuery().Count(&total).Error; err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	var nextSince time.Time
+	var maxSince sql.NullTime
+	if err := baseQuery().Select("MAX(books.updated_at)").Scan(&maxSince).Error; err != nil {
+		return nil, 0, time.Time{}, err
+	}
+	if maxSince.Valid {
+		nextSince = maxSince.Time
+	}
+
+	offset := (page - 1) * pageSize
+	if err := baseQuery().
+		Select("books.*, categories.name AS category_name").
+		Order("books.updated_at ASC, books.id ASC").
+		Offset(offset).Limit(pageSize).
+		Scan(&books).Error; err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	return books, total, nextSince, nil
 }
 
 func (b *BookDAO) CreateBook(book *model.Book) error {

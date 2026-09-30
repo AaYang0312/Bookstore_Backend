@@ -13,12 +13,14 @@ import (
 )
 
 type BookController struct {
-	BookService *service.BookService
+	BookService       *service.BookService
+	BrowseLogService  *service.BrowseLogService
 }
 
 func NewBookController() *BookController {
 	return &BookController{
-		BookService: service.NewBookService(),
+		BookService:      service.NewBookService(),
+		BrowseLogService: service.NewBrowseLogService(),
 	}
 }
 
@@ -143,6 +145,10 @@ func (b *BookController) GetBookDetail(ctx *gin.Context) {
 			"message": "书籍不存在",
 		})
 		return
+	}
+	// 自动浏览埋点：路由挂了 OptionalAuthMiddleware，已登录用户顺带记录（异步、尽力而为）
+	if userID := getUserID(ctx); userID != 0 {
+		go b.BrowseLogService.RecordView(userID, intid)
 	}
 	ctx.JSON(200, gin.H{
 		"code":    0,

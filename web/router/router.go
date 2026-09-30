@@ -61,6 +61,8 @@ func InitRouter() *gin.Engine {
 	carouselController := controller.NewCarouselController()
 	adminController := controller.NewAdminController()
 	uploadController := controller.NewUploadController()
+	browseLogController := controller.NewBrowseLogController()
+	internalSyncController := controller.NewInternalSyncController()
 
 	adminWriteLimit := middleware.RedisRateLimit(
 		"admin-write:user",
@@ -147,6 +149,8 @@ func InitRouter() *gin.Engine {
 				auth.GET("/profile", userController.GetUserProfile)
 				auth.PUT("/profile", userController.UpdateUserProfile)
 				auth.PUT("/password", userController.ChangePassword)
+				auth.GET("/browse-history", browseLogController.GetBrowseHistory)
+				auth.GET("/agent-profile", browseLogController.GetAgentProfile)
 			}
 		}
 		book := v1.Group("/book")
@@ -164,8 +168,11 @@ func InitRouter() *gin.Engine {
 				),
 				bookController.SearchBooks,
 			)
-			book.GET("/detail/:id", bookController.GetBookDetail)
+			// 可选认证：带合法 JWT 时自动记录浏览（匿名访问不受影响）
+			book.GET("/detail/:id", middleware.OptionalAuthMiddleware(), bookController.GetBookDetail)
 			book.GET("/category/:category", bookController.GetBooksByCategory)
+			// 显式浏览埋点（JWT），供前端后续接入
+			book.POST("/:id/view", middleware.JWTAuthMiddleware(), browseLogController.RecordBookView)
 		}
 		favorite := v1.Group("/favorite")
 		favorite.Use(middleware.JWTAuthMiddleware())
@@ -204,6 +211,15 @@ func InitRouter() *gin.Engine {
 		{
 			carousel.GET("/list", carouselController.GetCarouselList)
 		}
+	}
+	internal := r.Group("/internal")
+	{
+		// Agent 向量库增量同步（共享密钥鉴权；未配置密钥时接口禁用）
+		internal.GET(
+			"/books/sync",
+			middleware.InternalSyncAuth(),
+			internalSyncController.BooksSync,
+		)
 	}
 	captcha := v1.Group("/captcha")
 	{

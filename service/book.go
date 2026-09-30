@@ -6,6 +6,7 @@ import (
 	"bookstore-manager/repository"
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -97,6 +98,11 @@ func (b *BookService) GetBookDetail(id int) (*model.Book, error) {
 
 func (b *BookService) GetBooksByCategory(categoryName string, page int, pageSize int) ([]*model.Book, int64, error) {
 	return b.BookDB.GetBooksByCategory(categoryName, page, pageSize)
+}
+
+// GetBooksForSync 内部只读同步（Agent 向量库增量入库数据源）
+func (b *BookService) GetBooksForSync(since *time.Time, page, pageSize int) ([]*repository.AdminBook, int64, time.Time, error) {
+	return b.BookDB.GetBooksForSync(since, page, pageSize)
 }
 
 func (b *BookService) AdminGetBooks(keyword string, status *int, page, pageSize int) ([]*repository.AdminBook, int64, error) {
