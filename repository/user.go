@@ -3,6 +3,7 @@ package repository
 import (
 	"bookstore-manager/global"
 	"bookstore-manager/model"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -37,9 +38,28 @@ func (u *UserDAO) CreateUser(user *model.User) error {
 func (u *UserDAO) CheckUserExists(username, phone, email string) (bool, error) {
 	var total int64
 
-	// 使用 OR 条件一次性检查三个字段
+	// 空值字段不参与查重：注册可不填手机号/邮箱，若空串参与 OR 匹配，
+	// 会命中所有同字段为空的存量用户，导致任何新用户都报“已存在”
+	conditions := make([]string, 0, 3)
+	args := make([]interface{}, 0, 3)
+	if username != "" {
+		conditions = append(conditions, "username = ?")
+		args = append(args, username)
+	}
+	if phone != "" {
+		conditions = append(conditions, "phone = ?")
+		args = append(args, phone)
+	}
+	if email != "" {
+		conditions = append(conditions, "email = ?")
+		args = append(args, email)
+	}
+	if len(conditions) == 0 {
+		return false, nil
+	}
+
 	err := u.db.Model(&model.User{}).
-		Where("username = ? OR phone = ? OR email = ?", username, phone, email).
+		Where(strings.Join(conditions, " OR "), args...).
 		Count(&total).Error
 
 	if err != nil {
